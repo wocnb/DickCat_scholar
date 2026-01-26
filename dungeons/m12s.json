@@ -1,0 +1,418 @@
+[
+  {
+    "string": "17s",
+    "chineseText": "补天之手",
+    "number": "400000",
+    "type1States": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      true,
+      true,
+      false
+    ],
+    "summary": 177693.64999999997
+  },
+  {
+    "string": "89s",
+    "chineseText": "细胞分摊",
+    "number": "300000",
+    "type1States": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      false,
+      true
+    ],
+    "summary": 170250
+  },
+  {
+    "string": "98s",
+    "chineseText": "细胞轰炸分摊",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 110700
+  },
+  {
+    "string": "108",
+    "chineseText": "补天之手",
+    "number": "400000",
+    "type1States": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      true,
+      true,
+      false
+    ],
+    "summary": 178386.2
+  },
+  {
+    "string": "189",
+    "chineseText": "溅血",
+    "number": "230000",
+    "type1States": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 159300
+  },
+  {
+    "string": "232",
+    "chineseText": "毒圈分散",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 153000
+  },
+  {
+    "string": "242",
+    "chineseText": "补天之手",
+    "number": "400000",
+    "type1States": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      true,
+      true,
+      false
+    ],
+    "summary": 165920.30000000002
+  },
+  {
+    "string": "268",
+    "chineseText": "喷毒加分散",
+    "number": "300000",
+    "type1States": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      false,
+      true
+    ],
+    "summary": 170250
+  },
+  {
+    "string": "276",
+    "chineseText": "拉线分散",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 134500
+  },
+  {
+    "string": "290",
+    "chineseText": "溅血",
+    "number": "230000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 180000
+  },
+  {
+    "string": "342",
+    "chineseText": "喋血",
+    "number": "300000",
+    "type1States": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      false,
+      true
+    ],
+    "summary": 135765
+  },
+  {
+    "string": "351",
+    "chineseText": "分摊分散",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 173000
+  },
+  {
+    "string": "372",
+    "chineseText": "喋血",
+    "number": "300000",
+    "type1States": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 169222.50000000003
+  },
+  {
+    "string": "381",
+    "chineseText": "分摊分散",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      true,
+      true,
+      false
+    ],
+    "summary": 154000
+  },
+  {
+    "string": "400",
+    "chineseText": "喋血",
+    "number": "300000",
+    "type1States": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 158895
+  },
+  {
+    "string": "409",
+    "chineseText": "分摊分散",
+    "number": "200000",
+    "type1States": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "type2States": [
+      false,
+      true,
+      false
+    ],
+    "summary": 126000
+  }
+]
