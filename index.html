@@ -89,6 +89,7 @@
         }
 
         /* 输入框样式 */
+        .string-input,
         .chinese-input,
         .number-input {
             width: 100%;
@@ -101,6 +102,7 @@
             color: #2d3748;
         }
 
+        .string-input:focus,
         .chinese-input:focus,
         .number-input:focus {
             outline: none;
@@ -110,6 +112,7 @@
             transform: translateY(-1px);
         }
 
+        .string-input::placeholder,
         .chinese-input::placeholder,
         .number-input::placeholder {
             color: #a0aec0;
@@ -153,9 +156,9 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
             background-color: rgba(255, 255, 255, 0.5);
             transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             cursor: pointer;
@@ -200,8 +203,8 @@
 
         /* 圆形按钮（用于交互类型2） */
         .interaction-state.circle {
-            width: 28px;
-            height: 28px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             border: 3px solid rgba(255, 255, 255, 0.5);
         }
@@ -229,8 +232,8 @@
         }
 
         .interaction-state.circle.active::after {
-            width: 12px;
-            height: 12px;
+            width: 16px;
+            height: 16px;
             background: linear-gradient(135deg, #81d4fa 0%, #4fc3f7 100%);
         }
 
@@ -242,8 +245,8 @@
         }
 
         .interaction-state.circle.type2-active::after {
-            width: 12px;
-            height: 12px;
+            width: 16px;
+            height: 16px;
             background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
         }
 
@@ -401,8 +404,9 @@
         <table id="dataTable">
             <thead>
                 <tr>
-                    <th style="width: 25%;">中文文本</th>
-                    <th style="width: 15%;">数字</th>
+                    <th style="width: 12%;">字符串</th>
+                    <th style="width: 18%;">中文文本</th>
+                    <th style="width: 12%;">数字</th>
                     <th style="width: 15%;">交互类型1</th>
                     <th style="width: 15%;">交互类型2</th>
                     <th style="width: 15%;">总结</th>
@@ -434,6 +438,7 @@
             const rowId = rowIdCounter++;
             const rowData = {
                 id: rowId,
+                string: '',
                 chineseText: '',
                 number: '',
                 type1States: [], // 交互类型1的状态数组
@@ -454,6 +459,19 @@
             tr.id = `row-${rowData.id}`;
 
             tr.innerHTML = `
+                <td>
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            class="string-input"
+                            id="string-${rowData.id}"
+                            placeholder="数字/sm"
+                            oninput="validateString(${rowData.id})"
+                            onblur="updateData(${rowData.id})"
+                        >
+                        <div class="error-message" id="string-error-${rowData.id}">只能输入数字或字母s/m</div>
+                    </div>
+                </td>
                 <td>
                     <div class="input-group">
                         <input
@@ -512,19 +530,20 @@
             const rowData = tableData.find(r => r.id === rowId);
             if (!rowData) return;
 
-            // 初始化交互类型1的元素（默认3个，使用图片）
+            // 初始化交互类型1的元素（13个，使用图片）
             const type1Container = document.getElementById(`type1-${rowId}`);
             type1Container.innerHTML = '';
             rowData.type1States = [];
 
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 13; i++) {
                 const state = { id: i, active: false };
                 rowData.type1States.push(state);
 
                 const element = document.createElement('div');
                 element.className = 'interaction-state';
                 element.id = `type1-${rowId}-${i}`;
-                element.style.marginRight = '8px';
+                element.style.marginRight = '4px';
+                element.style.marginBottom = '4px';
 
                 // 添加图片
                 const img = document.createElement('img');
@@ -536,12 +555,12 @@
                 type1Container.appendChild(element);
             }
 
-            // 初始化交互类型2的元素（默认2个，使用圆形按钮）
+            // 初始化交互类型2的元素（3个，使用圆形按钮）
             const type2Container = document.getElementById(`type2-${rowId}`);
             type2Container.innerHTML = '';
             rowData.type2States = [];
 
-            for (let i = 0; i < 2; i++) {
+            for (let i = 0; i < 3; i++) {
                 const state = { id: i, active: false };
                 rowData.type2States.push(state);
 
@@ -659,6 +678,29 @@
         }
 
         /**
+         * 验证字符串输入（只能输入数字和字母s/m）
+         * @param {number} rowId - 行ID
+         */
+        function validateString(rowId) {
+            const input = document.getElementById(`string-${rowId}`);
+            const errorMsg = document.getElementById(`string-error-${rowId}`);
+            const value = input.value;
+
+            // 正则表达式：只允许数字和字母s/m（不区分大小写）
+            const stringRegex = /^[0-9smSM]*$/;
+
+            if (value && !stringRegex.test(value)) {
+                input.classList.add('error');
+                errorMsg.style.display = 'block';
+                return false;
+            } else {
+                input.classList.remove('error');
+                errorMsg.style.display = 'none';
+                return true;
+            }
+        }
+
+        /**
          * 验证中文输入
          * @param {number} rowId - 行ID
          */
@@ -712,9 +754,11 @@
             const rowData = tableData.find(r => r.id === rowId);
             if (!rowData) return;
 
+            const stringInput = document.getElementById(`string-${rowId}`);
             const chineseInput = document.getElementById(`chinese-${rowId}`);
             const numberInput = document.getElementById(`number-${rowId}`);
 
+            rowData.string = stringInput.value;
             rowData.chineseText = chineseInput.value;
             rowData.number = numberInput.value;
 
@@ -741,6 +785,7 @@
          */
         function exportData() {
             const exportData = tableData.map(row => ({
+                string: row.string,
                 chineseText: row.chineseText,
                 number: row.number,
                 type1States: row.type1States.map(s => s.active),
