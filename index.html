@@ -545,17 +545,17 @@
                 element.style.marginRight = '4px';
                 element.style.marginBottom = '4px';
 
-                // 添加图片
+                // 添加图片，路径为 figs/type1/N.png
                 const img = document.createElement('img');
-                img.src = 'figs/1.png';
-                img.alt = `选项${i + 1}`;
+                img.src = `figs/type1/${i + 1}.png`;
+                img.alt = `类型1-选项${i + 1}`;
                 element.appendChild(img);
 
                 element.onclick = () => handleType1Interaction(rowId, i);
                 type1Container.appendChild(element);
             }
 
-            // 初始化交互类型2的元素（3个，使用圆形按钮）
+            // 初始化交互类型2的元素（3个，使用图片）
             const type2Container = document.getElementById(`type2-${rowId}`);
             type2Container.innerHTML = '';
             rowData.type2States = [];
@@ -564,10 +564,18 @@
                 const state = { id: i, active: false };
                 rowData.type2States.push(state);
 
-                const element = document.createElement('span');
-                element.className = 'interaction-state circle';
+                const element = document.createElement('div');
+                element.className = 'interaction-state';
                 element.id = `type2-${rowId}-${i}`;
-                element.style.marginRight = '5px';
+                element.style.marginRight = '4px';
+                element.style.marginBottom = '4px';
+
+                // 添加图片，路径为 figs/type2/N.png
+                const img = document.createElement('img');
+                img.src = `figs/type2/${i + 1}.png`;
+                img.alt = `类型2-选项${i + 1}`;
+                element.appendChild(img);
+
                 element.onclick = () => handleType2Interaction(rowId, i);
                 type2Container.appendChild(element);
             }
@@ -835,29 +843,27 @@
                 const state = { id: newId, active: false };
                 statesArray.push(state);
 
-                if (type === 1) {
-                    // 交互类型1：使用图片
-                    const element = document.createElement('div');
-                    element.className = 'interaction-state';
-                    element.id = `type1-${rowId}-${newId}`;
-                    element.style.marginRight = '8px';
+                // 创建图片按钮
+                const element = document.createElement('div');
+                element.className = 'interaction-state';
+                element.id = `type${type}-${rowId}-${newId}`;
+                element.style.marginRight = '4px';
+                element.style.marginBottom = '4px';
 
-                    const img = document.createElement('img');
-                    img.src = 'figs/1.png';
-                    img.alt = `选项${newId + 1}`;
-                    element.appendChild(img);
+                // 添加图片，路径为 figs/typeX/N.png
+                const img = document.createElement('img');
+                img.src = `figs/type${type}/${newId + 1}.png`;
+                img.alt = `类型${type}-选项${newId + 1}`;
+                element.appendChild(img);
 
-                    element.onclick = () => handleType1Interaction(rowId, newId);
-                    container.appendChild(element);
-                } else {
-                    // 交互类型2：使用圆形按钮
-                    const element = document.createElement('span');
-                    element.className = 'interaction-state circle';
-                    element.id = `type2-${rowId}-${newId}`;
-                    element.style.marginRight = '5px';
-                    element.onclick = () => handleType2Interaction(rowId, newId);
-                    container.appendChild(element);
-                }
+                element.onclick = () => {
+                    if (type === 1) {
+                        handleType1Interaction(rowId, newId);
+                    } else {
+                        handleType2Interaction(rowId, newId);
+                    }
+                };
+                container.appendChild(element);
             }
         }
 
