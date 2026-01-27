@@ -300,7 +300,6 @@ calculator.updateType2Coefficients([1000, 2000, 3000]);
 
 - **Square Enix** - 制作这么棒的FF14游戏喵
 - **FF14学者社区** - 提供减伤数据和经验喵
-- **永雏塔菲** - 灵感来源喵（如果不看就关注喵）
 
 ---
 
