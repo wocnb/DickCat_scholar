@@ -304,8 +304,8 @@ calculator.updateType2Coefficients([1000, 2000, 3000]);
 ## 📞 联系方式喵
 
 - **作者**: 辑巴猫喵
-- **项目主页**: [GitHub](https://github.com) 喵
-- **问题反馈**: [Issues](https://github.com/xxx/issues) 喵
+- **项目主页**: [GitHub](https://github.com/wocnb) 喵
+- **问题反馈**: [Issues](https://github.com/wocnb/DickCat_scholar/issues) 喵
 
 ---
 
