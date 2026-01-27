@@ -187,9 +187,6 @@ DickCat_scholar-main/
 │
 ├── index.html                # 主页面（猫咪主题）喵
 ├── README.md                 # 本文件喵
-├── REFACTORING.md            # 重构文档喵
-├── AUTO_CONFIG_GUIDE.md      # 自动配置使用指南喵
-└── UPDATE_v3.0.md            # 版本更新日志喵
 ```
 
 ---
