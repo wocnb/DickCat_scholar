@@ -47,7 +47,7 @@ xdg-open index.html # Linux
 
 #### 步骤1：创建配置文件喵
 
-在 `configs/` 文件夹创建 `your_config.js` 喵：
+在 `dungeons/` 文件夹创建 `your_config.js` 喵：
 
 ```javascript
 const YOUR_CONFIG_META = {
@@ -76,7 +76,7 @@ window.TABLE_CONFIGS.your_config = {
 
 #### 步骤2：添加到索引喵
 
-编辑 `configs/index.js` 喵：
+编辑 `dungeons/index.js` 喵：
 
 ```javascript
 const CONFIG_FILES = [
@@ -112,7 +112,7 @@ const CONFIG_FILES = [
 
 1. 编辑完减伤轴后，点击"导出数据喵"按钮喵
 2. 系统会自动下载 `.js` 格式的配置文件喵
-3. 导出的文件可以直接放入 `configs/` 文件夹使用喵
+3. 导出的文件可以直接放入 `dungeons/` 文件夹使用喵
 4. 也可以分享给队友，让他们导入你的减伤轴配置喵
 
 ---
@@ -165,7 +165,7 @@ const CONFIG_FILES = [
 
 ```
 DickCat_scholar-main/
-├── configs/                  # 配置文件夹喵
+├── dungeons/                  # 配置文件夹喵
 │   ├── index.js             # 配置索引（自动加载）喵
 │   └── m12s.js              # M12S副本配置示例喵
 │
@@ -241,15 +241,15 @@ DickCat_scholar-main/
 ### Q1: 配置加载失败怎么办喵？
 
 **A:** 检查以下几点喵：
-1. 配置文件是否放在 `configs/` 文件夹中喵
-2. 配置文件是否添加到 `configs/index.js` 的 `CONFIG_FILES` 数组中喵
+1. 配置文件是否放在 `dungeons/` 文件夹中喵
+2. 配置文件是否添加到 `dungeons/index.js` 的 `CONFIG_FILES` 数组中喵
 3. 浏览器控制台是否有错误信息喵
 
 ### Q2: 导出的文件怎么用喵？
 
 **A:** 导出的是 `.js` 配置文件喵，只需：
-1. 复制到 `configs/` 文件夹喵
-2. 在 `configs/index.js` 中添加文件名喵
+1. 复制到 `dungeons/` 文件夹喵
+2. 在 `dungeons/index.js` 中添加文件名喵
 3. 刷新页面即可在下拉菜单中看到喵
 
 ### Q3: 如何修改减伤系数喵？
@@ -297,7 +297,6 @@ calculator.updateType2Coefficients([1000, 2000, 3000]);
 
 - **Square Enix** - 制作这么棒的FF14游戏喵
 - **FF14学者社区** - 提供减伤数据和经验喵
-- **永雏塔菲** - 灵感来源喵（如果不看就关注喵）
 
 ---
 
