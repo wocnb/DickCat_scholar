@@ -27,6 +27,7 @@
         </div>
 
         <div class="button-container">
+            <button class="btn btn-primary" onclick="jobSelector.open()">⚔️ 职业选择喵</button>
             <button class="btn btn-primary" onclick="dataHandler.addRow()">添加行喵</button>
             <button class="btn btn-secondary" onclick="exportManager.exportData()">导出数据喵</button>
             <button class="btn btn-danger" onclick="dataHandler.clearAll()">清空表格喵</button>
@@ -51,10 +52,11 @@
     </div>
 
     <!-- JavaScript 技能常量配置 -->
+    <script src="js/config/jobConstants.js"></script>
     <script src="js/config/skillConstants.js"></script>
 
     <!-- JavaScript 配置索引（自动加载所有配置） -->
-    <script src="configs/index.js"></script>
+    <script src="dungeons/index.js"></script>
 
     <!-- JavaScript 模块文件 -->
     <script src="js/modules/configLoader.js"></script>
@@ -66,6 +68,8 @@
     <script src="js/modules/dataHandler.js"></script>
     <script src="js/modules/exportManager.js"></script>
     <script src="js/modules/configHandler.js"></script>
+    <script src="js/modules/skillsConfigManager.js"></script>
+    <script src="js/modules/jobSelector.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

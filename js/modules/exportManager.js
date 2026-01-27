@@ -54,28 +54,16 @@ class ExportManager {
         const displayName = configName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
         // 转换数据格式（使用dataManager的exportData方法）
-        const rawData = dataManager.exportData();
+        const exportedData = dataManager.exportData();
+        const rawData = exportedData.data || [];
 
         // 生成配置数据数组（字典格式）
         const configDataArray = rawData.map(row => {
-            let type1Str, type2Str;
-
-            if (this.isDictFormat(row.type1States)) {
-                // 字典格式：美化输出
-                type1Str = this.formatDictToString(row.type1States);
-                type2Str = this.formatDictToString(row.type2States);
-            } else {
-                // 数组格式：JSON序列化
-                type1Str = JSON.stringify(row.type1States);
-                type2Str = JSON.stringify(row.type2States);
-            }
-
             return {
                 string: row.string,
                 chineseText: row.chineseText,
                 number: row.number,
-                type1States: row.type1States,
-                type2States: row.type2States,
+                skills: row.skills,
                 summary: row.summary
             };
         });
@@ -88,33 +76,15 @@ class ExportManager {
             dataString += `        chineseText: "${row.chineseText}",\n`;
             dataString += `        number: "${row.number}",\n`;
 
-            // 格式化 type1States
-            if (this.isDictFormat(row.type1States)) {
-                dataString += '        type1States: {\n';
-                const type1Keys = Object.keys(row.type1States);
-                type1Keys.forEach((key, i) => {
-                    dataString += `            "${key}": ${row.type1States[key]}`;
-                    if (i < type1Keys.length - 1) dataString += ',';
-                    dataString += '\n';
-                });
-                dataString += '        },\n';
-            } else {
-                dataString += `        type1States: ${JSON.stringify(row.type1States)},\n`;
-            }
-
-            // 格式化 type2States
-            if (this.isDictFormat(row.type2States)) {
-                dataString += '        type2States: {\n';
-                const type2Keys = Object.keys(row.type2States);
-                type2Keys.forEach((key, i) => {
-                    dataString += `            "${key}": ${row.type2States[key]}`;
-                    if (i < type2Keys.length - 1) dataString += ',';
-                    dataString += '\n';
-                });
-                dataString += '        },\n';
-            } else {
-                dataString += `        type2States: ${JSON.stringify(row.type2States)},\n`;
-            }
+            // 格式化 skills
+            dataString += '        skills: {\n';
+            const skillKeys = Object.keys(row.skills);
+            skillKeys.forEach((key, i) => {
+                dataString += `            "${key}": ${row.skills[key]}`;
+                if (i < skillKeys.length - 1) dataString += ',';
+                dataString += '\n';
+            });
+            dataString += '        },\n';
 
             dataString += `        summary: ${row.summary}\n`;
             dataString += '    }';
@@ -122,6 +92,12 @@ class ExportManager {
             dataString += '\n';
         });
         dataString += ']';
+
+        // 生成职业选择字符串
+        let jobSelectionString = 'null';
+        if (exportedData.meta && exportedData.meta.jobSelection) {
+            jobSelectionString = JSON.stringify(exportedData.meta.jobSelection, null, 8);
+        }
 
         // 生成 JS 文件
         return `/**
@@ -136,7 +112,8 @@ const ${configName.toUpperCase()}_CONFIG_META = {
     version: '1.0.0',
     description: '导出的配置数据',
     updatedAt: '${new Date().toISOString().split('T')[0]}',
-    dataCount: ${data.length}
+    dataCount: ${rawData.length},
+    jobSelection: ${jobSelectionString}
 };
 
 // 配置数据（使用字典格式，更易读）
@@ -149,7 +126,7 @@ window.TABLE_CONFIGS['${configName}'] = {
     data: ${configName.toUpperCase()}_CONFIG_DATA
 };
 
-console.log(\`✓ 配置加载成功: ${displayName} (${data.length} 条数据)\`);
+console.log(\`✓ 配置加载成功: ${displayName} (${rawData.length} 条数据)\`);
 `;
     }
 
@@ -201,8 +178,17 @@ console.log(\`✓ 配置加载成功: ${displayName} (${data.length} 条数据)\
             return;
         }
 
+        // 获取所有技能名称（作为CSV列头）
+        const allSkillNames = new Set();
+        data.forEach(row => {
+            if (row.skills && typeof row.skills === 'object') {
+                Object.keys(row.skills).forEach(skillName => allSkillNames.add(skillName));
+            }
+        });
+        const sortedSkillNames = Array.from(allSkillNames).sort();
+
         // CSV 头部
-        let csv = '字符串,中文文本,数字,类型1状态,类型2状态,总结\n';
+        let csv = '字符串,中文文本,数字,' + sortedSkillNames.join(',') + ',总结\n';
 
         // 数据行
         data.forEach(row => {
@@ -210,20 +196,11 @@ console.log(\`✓ 配置加载成功: ${displayName} (${data.length} 条数据)\
             csv += `"${row.chineseText}",`;
             csv += `"${row.number}",`;
 
-            // 处理状态数据
-            if (this.isDictFormat(row.type1States)) {
-                const type1Values = Object.values(row.type1States).map(v => v ? '1' : '0');
-                csv += `"${type1Values.join(',')}",`;
-            } else {
-                csv += `"${row.type1States.map(s => s.active ? '1' : '0').join(',')}",`;
-            }
-
-            if (this.isDictFormat(row.type2States)) {
-                const type2Values = Object.values(row.type2States).map(v => v ? '1' : '0');
-                csv += `"${type2Values.join(',')}",`;
-            } else {
-                csv += `"${row.type2States.map(s => s.active ? '1' : '0').join(',')}",`;
-            }
+            // 处理技能状态
+            sortedSkillNames.forEach(skillName => {
+                const skillValue = (row.skills && row.skills[skillName]) ? '1' : '0';
+                csv += `"${skillValue}",`;
+            });
 
             csv += `"${row.summary.toFixed(2)}"\n`;
         });

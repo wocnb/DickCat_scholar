@@ -17,6 +17,23 @@ class App {
 
         console.log('初始化交互式表格应用...');
 
+        // 0. 保存默认技能配置
+        if (window.SKILL_CONSTANTS && window.SKILL_CONSTANTS.DEFAULT_SKILLS_CONFIG) {
+            window.DEFAULT_SKILLS_CONFIG = JSON.parse(
+                JSON.stringify(window.SKILL_CONSTANTS.DEFAULT_SKILLS_CONFIG)
+            );
+            console.log('✓ 默认技能配置已保存');
+        }
+
+        // 订阅技能配置变化
+        if (window.skillsConfigManager) {
+            window.skillsConfigManager.subscribe((action, skillName, data) => {
+                console.log(`技能配置变化: ${action} - ${skillName}`);
+                // 当技能配置变化时，重新渲染所有行的技能按钮
+                this.refreshAllSkills();
+            });
+        }
+
         // 1. 自动加载所有配置文件
         if (window.AUTO_CONFIG_LOADER) {
             try {
@@ -37,13 +54,43 @@ class App {
             }
         }
 
-        // 3. 添加默认行
+        // 3. 加载保存的职业选择并应用技能过滤
+        if (window.loadJobSelectionFromStorage) {
+            const savedJobs = window.loadJobSelectionFromStorage();
+            if (savedJobs) {
+                const selectedJobs = Object.values(savedJobs);
+                console.log('✓ 已加载保存的职业配置:', selectedJobs);
+                // 根据职业生成技能配置
+                if (window.SKILL_CONSTANTS?.updateSkillsConfigByJobs) {
+                    window.SKILL_CONSTANTS.updateSkillsConfigByJobs(selectedJobs);
+                }
+            }
+        }
+
+        // 4. 添加默认行
         dataHandler.addRow();
         dataHandler.addRow();
         dataHandler.addRow();
 
         this.initialized = true;
         console.log('应用初始化完成');
+    }
+
+    /**
+     * 刷新所有行的技能按钮
+     */
+    refreshAllSkills() {
+        const allData = dataManager.getAllData();
+        allData.forEach(rowData => {
+            // 重新渲染技能按钮
+            const tbody = document.getElementById('tableBody');
+            const existingRow = document.getElementById(`row-${rowData.id}`);
+            if (existingRow) {
+                existingRow.remove();
+            }
+            uiRenderer.renderRow(rowData);
+        });
+        console.log('✓ 所有行的技能按钮已刷新');
     }
 }
 
@@ -156,6 +203,25 @@ window.TableAPI = {
      */
     refreshConfigs: async () => {
         await configHandler.refreshConfigSelector();
+    },
+
+    /**
+     * 技能配置管理API（简化版）
+     */
+    skills: {
+        /**
+         * 更新技能配置
+         */
+        update: (skillName, skillConfig) => {
+            return skillsConfigManager.updateSkill(skillName, skillConfig);
+        },
+
+        /**
+         * 重置为默认配置
+         */
+        reset: () => {
+            skillsConfigManager.resetToDefault();
+        }
     }
 };
 
@@ -165,4 +231,6 @@ window.validator = validator;
 window.interactionHandler = interactionHandler;
 window.configHandler = configHandler;
 window.configLoader = configLoader;
+window.skillsConfigManager = skillsConfigManager;
+window.jobSelector = jobSelector;
 
