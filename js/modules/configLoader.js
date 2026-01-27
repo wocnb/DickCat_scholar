@@ -108,7 +108,7 @@ class ConfigLoader {
     }
 
     /**
-     * 验证配置数据格式（支持字典格式和数组格式）
+     * 验证配置数据格式（使用新的 skills 字典格式）
      * @param {Array} configData - 配置数据
      * @returns {boolean} 是否有效
      */
@@ -120,82 +120,39 @@ class ConfigLoader {
 
         for (let i = 0; i < configData.length; i++) {
             const item = configData[i];
+
+            // 检查基本字段
             if (!item.hasOwnProperty('string') ||
                 !item.hasOwnProperty('chineseText') ||
-                !item.hasOwnProperty('number') ||
-                !item.hasOwnProperty('type1States') ||
-                !item.hasOwnProperty('type2States')) {
+                !item.hasOwnProperty('number')) {
                 console.error(`配置项 ${i} 缺少必要字段`, item);
                 return false;
             }
 
-            // 验证 type1States（支持字典和数组格式）
-            const isType1Dict = this.isDictFormat(item.type1States);
-            if (isType1Dict) {
-                // 字典格式：检查包含所有必需的技能键
-                if (window.SKILL_CONSTANTS && window.SKILL_CONSTANTS.TYPE1_SKILLS) {
-                    const requiredSkills = window.SKILL_CONSTANTS.TYPE1_SKILLS;
-                    for (const skill of requiredSkills) {
-                        if (!item.type1States.hasOwnProperty(skill)) {
-                            console.error(`配置项 ${i} 的 type1States 缺少技能键: ${skill}`);
-                            return false;
-                        }
-                    }
-                }
-            } else if (Array.isArray(item.type1States)) {
-                // 数组格式：检查长度
-                if (item.type1States.length !== 13) {
-                    console.error(`配置项 ${i} 的 type1States 数组必须包含13个元素`);
-                    return false;
-                }
-            } else {
-                console.error(`配置项 ${i} 的 type1States 格式无效`);
+            // 检查 skills 字段（新格式）
+            if (!item.hasOwnProperty('skills')) {
+                console.error(`配置项 ${i} 缺少 skills 字段`, item);
                 return false;
             }
 
-            // 验证 type2States（支持字典和数组格式）
-            const isType2Dict = this.isDictFormat(item.type2States);
-            if (isType2Dict) {
-                // 字典格式：检查包含所有必需的技能键
-                if (window.SKILL_CONSTANTS && window.SKILL_CONSTANTS.TYPE2_SKILLS) {
-                    const requiredSkills = window.SKILL_CONSTANTS.TYPE2_SKILLS;
-                    for (const skill of requiredSkills) {
-                        if (!item.type2States.hasOwnProperty(skill)) {
-                            console.error(`配置项 ${i} 的 type2States 缺少技能键: ${skill}`);
-                            return false;
-                        }
+            // 验证 skills 是字典格式
+            if (!this.isDictFormat(item.skills)) {
+                console.error(`配置项 ${i} 的 skills 必须是字典格式`, item);
+                return false;
+            }
+
+            // 验证 skills 中的技能是否在配置中
+            if (window.SKILL_CONSTANTS && window.SKILL_CONSTANTS.SKILLS_CONFIG) {
+                const validSkills = window.SKILL_CONSTANTS.SKILLS_CONFIG;
+                for (const skillName in item.skills) {
+                    if (!validSkills.hasOwnProperty(skillName)) {
+                        console.warn(`配置项 ${i} 包含未定义的技能: ${skillName}`);
                     }
                 }
-            } else if (Array.isArray(item.type2States)) {
-                // 数组格式：检查长度
-                if (item.type2States.length !== 3) {
-                    console.error(`配置项 ${i} 的 type2States 数组必须包含3个元素`);
-                    return false;
-                }
-            } else {
-                console.error(`配置项 ${i} 的 type2States 格式无效`);
-                return false;
             }
         }
 
         return true;
-    }
-
-    /**
-     * 将配置数据转换为表格数据格式
-     * @param {Array} configData - 配置数据
-     * @returns {Array} 表格数据
-     */
-    configToTableData(configData) {
-        return configData.map((item, index) => ({
-            id: index,
-            string: item.string || '',
-            chineseText: item.chineseText || '',
-            number: item.number || '',
-            type1States: item.type1States.map((active, i) => ({ id: i, active })),
-            type2States: item.type2States.map((active, i) => ({ id: i, active })),
-            summary: item.summary || 0
-        }));
     }
 
     /**

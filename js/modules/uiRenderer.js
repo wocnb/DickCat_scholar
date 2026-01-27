@@ -1,14 +1,20 @@
 /**
  * UI 渲染模块
- * 负责表格行的渲染和交互元素的初始化
- * 支持字典格式和数组格式的状态数据
+ * 按技能type分组渲染交互元素
  */
-
 class UIRenderer {
     constructor() {
-        // 从技能常量获取技能列表
-        this.type1Skills = window.SKILL_CONSTANTS?.TYPE1_SKILLS || [];
-        this.type2Skills = window.SKILL_CONSTANTS?.TYPE2_SKILLS || [];
+        // 不再保存快照，而是使用 getter 实时获取配置
+    }
+
+    // 获取当前的技能配置
+    get skillsConfig() {
+        return window.SKILL_CONSTANTS?.SKILLS_CONFIG || {};
+    }
+
+    // 获取当前的 getSkillNamesByType 函数
+    get getSkillNamesByType() {
+        return window.SKILL_CONSTANTS?.getSkillNamesByType || (() => []);
     }
 
     /**
@@ -65,12 +71,12 @@ class UIRenderer {
             </td>
             <td>
                 <div class="interactive-cell type1" id="type1-${rowData.id}">
-                    <!-- 交互类型1的元素将动态生成 -->
+                    <!-- 乘法减伤技能将动态生成 -->
                 </div>
             </td>
             <td>
                 <div class="interactive-cell type2" id="type2-${rowData.id}">
-                    <!-- 交互类型2的元素将动态生成 -->
+                    <!-- 减法减伤技能将动态生成 -->
                 </div>
             </td>
             <td class="summary-cell" id="summary-${rowData.id}">
@@ -92,148 +98,74 @@ class UIRenderer {
      * @param {Object} rowData - 行数据对象
      */
     initInteractiveElements(rowData) {
-        // 初始化交互类型1的元素（使用技能常量）
-        this.initType1Elements(rowData);
+        const skills = rowData.skills || {};
 
-        // 初始化交互类型2的元素（使用技能常量）
-        this.initType2Elements(rowData);
+        // 渲染type1技能 (乘法减伤)
+        this.renderSkillsByType(rowData.id, 1, skills);
+
+        // 渲染type2技能 (减法减伤)
+        this.renderSkillsByType(rowData.id, 2, skills);
     }
 
     /**
-     * 判断是否为字典格式
-     * @param {*} states - 状态数据
-     * @returns {boolean} 是否为字典格式
+     * 根据type渲染技能
+     * @param {number} rowId - 行ID
+     * @param {number} type - 技能类型
+     * @param {Object} skills - 技能状态字典
      */
-    isDictFormat(states) {
-        return states && typeof states === 'object' && !Array.isArray(states);
-    }
+    renderSkillsByType(rowId, type, skills) {
+        const container = document.getElementById(`type${type}-${rowId}`);
+        container.innerHTML = '';
 
-    /**
-     * 初始化类型1交互元素（支持字典和数组格式）
-     * @param {Object} rowData - 行数据对象
-     */
-    initType1Elements(rowData) {
-        const type1Container = document.getElementById(`type1-${rowData.id}`);
-        type1Container.innerHTML = '';
+        const skillNames = this.getSkillNamesByType(type);
 
-        // 如果没有技能常量，使用默认的13个元素
-        const skillCount = this.type1Skills.length || 13;
-        const skills = this.type1Skills.length > 0 ? this.type1Skills : null;
-        const isDict = this.isDictFormat(rowData.type1States);
+        skillNames.forEach((skillName) => {
+            const config = this.skillsConfig[skillName];
+            const isActive = Boolean(skills[skillName]);
 
-        if (isDict && skills) {
-            // 字典格式：遍历技能名称
-            skills.forEach((skillName, index) => {
-                const isActive = Boolean(rowData.type1States[skillName]);
+            // 获取图片文件名（去除数字后缀，如"血仇1" -> "血仇.png"）
+            const imageName = this.getSkillImageName(skillName);
 
-                const element = this.createInteractionElement(
-                    `type1-${rowData.id}-${index}`,
-                    `figs/type1/${index + 1}.png`,
-                    skillName,  // 使用技能名称作为提示文本
-                    () => interactionHandler.handleType1Interaction(rowData.id, skillName)
-                );
+            const element = this.createInteractionElement(
+                rowId,
+                skillName,
+                `figs/skills/${imageName}`,
+                skillName,
+                () => interactionHandler.handleSkillInteraction(rowId, skillName)
+            );
 
-                if (isActive) {
-                    element.classList.add('active');
-                }
-
-                type1Container.appendChild(element);
-            });
-        } else {
-            // 数组格式：向后兼容
-            const statesArray = rowData.type1States || [];
-
-            for (let i = 0; i < skillCount; i++) {
-                // 如果状态不存在，创建默认状态
-                if (!statesArray[i]) {
-                    statesArray[i] = { id: i, active: false };
-                }
-
-                const element = this.createInteractionElement(
-                    `type1-${rowData.id}-${i}`,
-                    `figs/type1/${i + 1}.png`,
-                    skills ? skills[i] : `类型1-选项${i + 1}`,
-                    () => interactionHandler.handleType1Interaction(rowData.id, i)
-                );
-
-                if (statesArray[i].active) {
-                    element.classList.add('active');
-                }
-
-                type1Container.appendChild(element);
+            if (isActive) {
+                element.classList.add('active');
             }
-        }
+
+            container.appendChild(element);
+        });
     }
 
     /**
-     * 初始化类型2交互元素（支持字典和数组格式）
-     * @param {Object} rowData - 行数据对象
+     * 获取技能图片文件名
+     * @param {string} skillName - 技能名称
+     * @returns {string} 图片文件名
      */
-    initType2Elements(rowData) {
-        const type2Container = document.getElementById(`type2-${rowData.id}`);
-        type2Container.innerHTML = '';
-
-        // 如果没有技能常量，使用默认的3个元素
-        const skillCount = this.type2Skills.length || 3;
-        const skills = this.type2Skills.length > 0 ? this.type2Skills : null;
-        const isDict = this.isDictFormat(rowData.type2States);
-
-        if (isDict && skills) {
-            // 字典格式：遍历技能名称
-            skills.forEach((skillName, index) => {
-                const isActive = Boolean(rowData.type2States[skillName]);
-
-                const element = this.createInteractionElement(
-                    `type2-${rowData.id}-${index}`,
-                    `figs/type2/${index + 1}.png`,
-                    skillName,  // 使用技能名称作为提示文本
-                    () => interactionHandler.handleType2Interaction(rowData.id, skillName)
-                );
-
-                if (isActive) {
-                    element.classList.add('active');
-                }
-
-                type2Container.appendChild(element);
-            });
-        } else {
-            // 数组格式：向后兼容
-            const statesArray = rowData.type2States || [];
-
-            for (let i = 0; i < skillCount; i++) {
-                // 如果状态不存在，创建默认状态
-                if (!statesArray[i]) {
-                    statesArray[i] = { id: i, active: false };
-                }
-
-                const element = this.createInteractionElement(
-                    `type2-${rowData.id}-${i}`,
-                    `figs/type2/${i + 1}.png`,
-                    skills ? skills[i] : `类型2-选项${i + 1}`,
-                    () => interactionHandler.handleType2Interaction(rowData.id, i)
-                );
-
-                if (statesArray[i].active) {
-                    element.classList.add('active');
-                }
-
-                type2Container.appendChild(element);
-            }
-        }
+    getSkillImageName(skillName) {
+        // 去除数字后缀（例如："血仇1" -> "血仇.png"）
+        const baseName = skillName.replace(/\d+$/, '');
+        return `${baseName}.png`;
     }
 
     /**
      * 创建交互元素
-     * @param {string} id - 元素ID
+     * @param {number} rowId - 行ID
+     * @param {string} skillName - 技能名称
      * @param {string} imgSrc - 图片路径
-     * @param {string} altText - 替代文本（技能名称）
+     * @param {string} altText - 替代文本
      * @param {Function} clickHandler - 点击事件处理器
      * @returns {HTMLElement} 交互元素
      */
-    createInteractionElement(id, imgSrc, altText, clickHandler) {
+    createInteractionElement(rowId, skillName, imgSrc, altText, clickHandler) {
         const element = document.createElement('div');
         element.className = 'interaction-state';
-        element.id = id;
+        element.id = `skill-${rowId}-${skillName}`;  // 使用 rowId + skillName 确保唯一性
         element.style.marginRight = '4px';
         element.style.marginBottom = '4px';
 
@@ -260,6 +192,23 @@ class UIRenderer {
     }
 
     /**
+     * 更新技能状态显示
+     * @param {number} rowId - 行ID
+     * @param {string} skillName - 技能名称
+     * @param {boolean} isActive - 是否激活
+     */
+    updateSkillState(rowId, skillName, isActive) {
+        const element = document.getElementById(`skill-${rowId}-${skillName}`);
+        if (element) {
+            if (isActive) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+        }
+    }
+
+    /**
      * 移除行DOM
      * @param {number} rowId - 行ID
      */
@@ -267,47 +216,6 @@ class UIRenderer {
         const row = document.getElementById(`row-${rowId}`);
         if (row) {
             row.remove();
-        }
-    }
-
-    /**
-     * 添加更多交互元素（扩展功能）
-     * @param {Object} rowData - 行数据对象
-     * @param {number} type - 交互类型（1或2）
-     * @param {number} count - 要添加的数量
-     */
-    addInteractiveElements(rowData, type, count) {
-        const container = document.getElementById(`type${type}-${rowData.id}`);
-        const isDict = this.isDictFormat(
-            type === 1 ? rowData.type1States : rowData.type2States
-        );
-
-        if (isDict) {
-            console.warn('字典格式不支持动态添加元素');
-            return;
-        }
-
-        const statesArray = type === 1 ? rowData.type1States : rowData.type2States;
-
-        for (let i = 0; i < count; i++) {
-            const newId = statesArray.length;
-            const state = { id: newId, active: false };
-            statesArray.push(state);
-
-            const element = this.createInteractionElement(
-                `type${type}-${rowData.id}-${newId}`,
-                `figs/type${type}/${newId + 1}.png`,
-                `类型${type}-选项${newId + 1}`,
-                () => {
-                    if (type === 1) {
-                        interactionHandler.handleType1Interaction(rowData.id, newId);
-                    } else {
-                        interactionHandler.handleType2Interaction(rowData.id, newId);
-                    }
-                }
-            );
-
-            container.appendChild(element);
         }
     }
 }

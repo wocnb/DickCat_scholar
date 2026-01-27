@@ -1,9 +1,7 @@
 /**
  * 数据管理模块
- * 负责全局数据存储和行数据管理
- * 支持字典格式和数组格式的状态数据
+ * 使用统一的skills字典管理技能状态
  */
-
 class DataManager {
     constructor() {
         this.tableData = [];
@@ -17,26 +15,17 @@ class DataManager {
     createRowData() {
         const rowId = this.rowIdCounter++;
 
-        // 使用技能常量创建空的字典格式状态
-        let type1States, type2States;
-
-        if (window.SKILL_CONSTANTS) {
-            // 使用字典格式
-            type1States = window.SKILL_CONSTANTS.createEmptyType1Dict();
-            type2States = window.SKILL_CONSTANTS.createEmptyType2Dict();
-        } else {
-            // 向后兼容：使用数组格式
-            type1States = [];
-            type2States = [];
-        }
+        // 创建空的技能状态字典
+        const skills = window.SKILL_CONSTANTS
+            ? window.SKILL_CONSTANTS.createEmptySkillsDict()
+            : {};
 
         return {
             id: rowId,
             string: '',
             chineseText: '',
             number: '',
-            type1States: type1States,
-            type2States: type2States,
+            skills: skills,
             summary: 0
         };
     }
@@ -100,60 +89,33 @@ class DataManager {
     }
 
     /**
-     * 判断是否为字典格式
-     * @param {*} states - 状态数据
-     * @returns {boolean} 是否为字典格式
-     */
-    isDictFormat(states) {
-        return states && typeof states === 'object' && !Array.isArray(states);
-    }
-
-    /**
-     * 导出数据（用于导出功能）- 导出为字典格式
-     * @returns {Array} 格式化的导出数据
+     * 导出数据
+     * @returns {Object} 格式化的导出数据（包含职业信息）
      */
     exportData() {
-        return this.tableData.map(row => {
-            // 判断状态格式并导出
-            let type1States, type2States;
+        // 获取当前职业选择
+        const jobSelection = window.getJobSelection ? window.getJobSelection() : null;
 
-            if (this.isDictFormat(row.type1States)) {
-                // 字典格式：直接复制
-                type1States = { ...row.type1States };
-                type2States = { ...row.type2States };
-            } else {
-                // 数组格式：转换为字典
-                if (window.SKILL_CONSTANTS) {
-                    type1States = window.SKILL_CONSTANTS.convertArrayToDict(
-                        row.type1States.map(s => s.active),
-                        window.SKILL_CONSTANTS.TYPE1_SKILLS
-                    );
-                    type2States = window.SKILL_CONSTANTS.convertArrayToDict(
-                        row.type2States.map(s => s.active),
-                        window.SKILL_CONSTANTS.TYPE2_SKILLS
-                    );
-                } else {
-                    // 没有常量配置，导出数组格式
-                    type1States = row.type1States.map(s => s.active);
-                    type2States = row.type2States.map(s => s.active);
-                }
-            }
-
-            return {
+        return {
+            meta: {
+                version: '1.0.0',
+                exportedAt: new Date().toISOString(),
+                dataCount: this.tableData.length,
+                jobSelection: jobSelection
+            },
+            data: this.tableData.map(row => ({
                 string: row.string,
                 chineseText: row.chineseText,
                 number: row.number,
-                type1States: type1States,
-                type2States: type2States,
+                skills: { ...row.skills },
                 summary: row.summary
-            };
-        });
+            }))
+        };
     }
 
     /**
      * 批量加载数据（用于配置加载）
-     * 支持字典格式和数组格式
-     * @param {Array} configData - 配置数据数组
+     * @param {Array|Object} configData - 配置数据数组或包含meta和数据对象
      * @returns {Array} 加载的行数据
      */
     loadConfigData(configData) {
@@ -161,54 +123,45 @@ class DataManager {
         this.tableData = [];
         this.rowIdCounter = 0;
 
-        // 加载配置数据
-        configData.forEach((item, index) => {
-            let type1States, type2States;
+        // 处理包含meta的新格式
+        let dataArray = configData;
+        let jobSelection = null;
 
-            // 判断配置格式
-            const isType1Dict = this.isDictFormat(item.type1States);
-            const isType2Dict = this.isDictFormat(item.type2States);
-
-            if (isType1Dict && isType2Dict) {
-                // 字典格式：直接使用
-                type1States = { ...item.type1States };
-                type2States = { ...item.type2States };
-            } else {
-                // 数组格式：转换为内部格式
-                if (window.SKILL_CONSTANTS) {
-                    // 转换为字典格式
-                    type1States = window.SKILL_CONSTANTS.convertArrayToDict(
-                        item.type1States || [],
-                        window.SKILL_CONSTANTS.TYPE1_SKILLS
-                    );
-                    type2States = window.SKILL_CONSTANTS.convertArrayToDict(
-                        item.type2States || [],
-                        window.SKILL_CONSTANTS.TYPE2_SKILLS
-                    );
-                } else {
-                    // 向后兼容：保持数组格式
-                    type1States = (item.type1States || []).map((active, i) => ({
-                        id: i,
-                        active: Boolean(active)
-                    }));
-                    type2States = (item.type2States || []).map((active, i) => ({
-                        id: i,
-                        active: Boolean(active)
-                    }));
-                }
+        if (configData && typeof configData === 'object' && !Array.isArray(configData)) {
+            // 新格式：{meta: {...}, data: [...]}
+            if (configData.meta && configData.meta.jobSelection) {
+                jobSelection = configData.meta.jobSelection;
             }
+            dataArray = configData.data || [];
+        }
 
+        // 加载配置数据
+        dataArray.forEach((item) => {
             const rowData = {
                 id: this.rowIdCounter++,
                 string: item.string || '',
                 chineseText: item.chineseText || '',
                 number: item.number || '',
-                type1States: type1States,
-                type2States: type2States,
+                skills: item.skills ? { ...item.skills } : {},
                 summary: item.summary || 0
             };
             this.tableData.push(rowData);
         });
+
+        // 如果导出数据中包含职业信息，则应用职业配置
+        if (jobSelection) {
+            // 更新全局职业选择
+            if (window.setJobSelection) {
+                window.setJobSelection(jobSelection);
+            }
+
+            // 同步更新jobSelector的内部状态
+            if (window.jobSelector && window.jobSelector.setSelection) {
+                window.jobSelector.setSelection(jobSelection);
+            }
+
+            console.log('✓ 已从导出数据加载职业配置:', jobSelection);
+        }
 
         return this.tableData;
     }
