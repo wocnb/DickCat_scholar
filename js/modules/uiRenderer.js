@@ -47,12 +47,12 @@ class UIRenderer {
                         type="text"
                         class="chinese-input"
                         id="chinese-${rowData.id}"
-                        placeholder="请输入中文"
-                        value="${rowData.chineseText || ''}"
+                        placeholder="技能/机制名称"
+                        value="${this.escapeHtml(rowData.chineseText || '')}"
                         oninput="validator.validateAndUpdate(${rowData.id}, 'chinese')"
                         onblur="dataHandler.updateData(${rowData.id})"
                     >
-                    <div class="error-message" id="chinese-error-${rowData.id}">只能输入中文字符</div>
+                    <div class="error-message" id="chinese-error-${rowData.id}">可输入中英文、数字和常用符号</div>
                 </div>
             </td>
             <td>
@@ -80,7 +80,7 @@ class UIRenderer {
                 </div>
             </td>
             <td class="summary-cell" id="summary-${rowData.id}">
-                ${rowData.summary ? rowData.summary.toFixed(2) : '0'}
+                ${this.createSummaryMarkup(rowData.summary)}
             </td>
             <td style="text-align: center;">
                 <button class="btn btn-danger btn-sm" onclick="dataHandler.deleteRow(${rowData.id})">删除</button>
@@ -150,6 +150,14 @@ class UIRenderer {
     getSkillImageName(skillName) {
         // 去除数字后缀（例如："血仇1" -> "血仇.png"）
         const baseName = skillName.replace(/\d+$/, '');
+        const imageAliases = {
+            '扩散盾': '展开战术'
+        };
+
+        if (imageAliases[baseName]) {
+            return `${imageAliases[baseName]}.png`;
+        }
+
         return `${baseName}.png`;
     }
 
@@ -168,15 +176,69 @@ class UIRenderer {
         element.id = `skill-${rowId}-${skillName}`;  // 使用 rowId + skillName 确保唯一性
         element.style.marginRight = '4px';
         element.style.marginBottom = '4px';
+        element.title = this.getSkillTooltip(skillName);
 
         const img = document.createElement('img');
         img.src = imgSrc;
         img.alt = altText;
+        img.onerror = () => {
+            element.classList.add('missing-icon');
+            const fallback = document.createElement('span');
+            fallback.className = 'skill-fallback';
+            fallback.textContent = this.getFallbackLabel(skillName);
+            element.replaceChildren(fallback);
+        };
         element.appendChild(img);
 
         element.onclick = clickHandler;
 
         return element;
+    }
+
+    /**
+     * 获取技能提示文案
+     * @param {string} skillName - 技能名称
+     * @returns {string} tooltip文案
+     */
+    getSkillTooltip(skillName) {
+        const config = this.skillsConfig[skillName] || {};
+        const baseName = config.baseName || skillName.replace(/\d+$/, '');
+        const sourceJob = config.sourceJob ? ` / ${config.sourceJob.toUpperCase()}` : '';
+        const cooldown = Number.isFinite(config.cooldown) ? ` / CD ${config.cooldown}s` : '';
+        const effect = config.effect ? `\n${config.effect}` : '';
+
+        return `${skillName}${sourceJob}${cooldown}${effect || `\n${baseName}`}`;
+    }
+
+    /**
+     * 缺少技能图标时显示短标签
+     * @param {string} skillName - 技能名称
+     * @returns {string} 短标签
+     */
+    getFallbackLabel(skillName) {
+        const baseName = (this.skillsConfig[skillName]?.baseName || skillName).replace(/\d+$/, '');
+        return baseName.length <= 2 ? baseName : baseName.slice(0, 2);
+    }
+
+    escapeHtml(value) {
+        return String(value).replace(/[&<>'"]/g, character => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        })[character]);
+    }
+
+    createSummaryMarkup(value) {
+        const damage = Number(value) || 0;
+        const low = damage * 0.95;
+        const high = damage * 1.05;
+
+        return `
+            <div class="summary-value">${damage.toFixed(2)}</div>
+            <div class="summary-range">-5% ${low.toFixed(2)} / +5% ${high.toFixed(2)}</div>
+        `;
     }
 
     /**
@@ -187,7 +249,7 @@ class UIRenderer {
     updateSummary(rowId, value) {
         const summaryElement = document.getElementById(`summary-${rowId}`);
         if (summaryElement) {
-            summaryElement.textContent = value.toFixed(2);
+            summaryElement.innerHTML = this.createSummaryMarkup(value);
         }
     }
 

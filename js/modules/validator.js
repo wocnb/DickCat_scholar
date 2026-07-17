@@ -11,7 +11,7 @@ class Validator {
      * @returns {boolean} 验证是否通过
      */
     validateString(value) {
-        const stringRegex = /^[0-9smSM]*$/;
+        const stringRegex = /^(?:\d+(?:\.\d+)?[sS]?|\d+(?:\.\d+)?[mM](?:\d+(?:\.\d+)?[sS]?)?)?$/;
         return stringRegex.test(value);
     }
 
@@ -21,9 +21,9 @@ class Validator {
      * @returns {boolean} 验证是否通过
      */
     validateChinese(value) {
-        // 正则表达式：只允许中文字符（包括中文标点）
-        const chineseRegex = /^[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]*$/;
-        return chineseRegex.test(value);
+        // FFLogs 可能导出中英文技能名，保留常用的机制命名字符。
+        const mechanicNameRegex = /^[\u4e00-\u9fa5\u3000-\u303fa-zA-Z0-9\s'’".,:：()（）+\-_/]*$/;
+        return mechanicNameRegex.test(value);
     }
 
     /**

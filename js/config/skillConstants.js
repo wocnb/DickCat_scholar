@@ -44,36 +44,39 @@ let SKILLS_CONFIG = { ...DEFAULT_SKILLS_CONFIG };
 function generateSkillsConfigByJobs(jobIds) {
     const jobs = Array.isArray(jobIds) ? jobIds : [jobIds];
     const mergedConfig = {};
+    const skillEntries = [];
+    const skillNameTotals = {};
 
-    // 跟踪每个技能名称出现的次数
-    const skillNameCounters = {};
-
-    // 遍历每个选中的职业（保持顺序）
-    jobs.forEach((jobId, jobIndex) => {
+    // 先收集技能，确认哪些技能会重复出现
+    jobs.forEach((jobId) => {
         const jobSkills = JOB_SKILLS_MAP[jobId];
         if (jobSkills) {
-            // 合并该职业的所有技能
             Object.keys(jobSkills).forEach(skillName => {
-                const skillConfig = { ...jobSkills[skillName] };
-
-                // 初始化计数器
-                if (!skillNameCounters[skillName]) {
-                    skillNameCounters[skillName] = 0;
-                }
-
-                // 增加计数
-                skillNameCounters[skillName]++;
-
-                // 如果是第一次出现，使用原名
-                if (skillNameCounters[skillName] === 1) {
-                    mergedConfig[skillName] = skillConfig;
-                } else {
-                    // 如果是重复出现，添加数字后缀
-                    const newSkillName = `${skillName}${skillNameCounters[skillName]}`;
-                    mergedConfig[newSkillName] = skillConfig;
-                }
+                skillNameTotals[skillName] = (skillNameTotals[skillName] || 0) + 1;
+                skillEntries.push({
+                    jobId,
+                    skillName,
+                    skillConfig: jobSkills[skillName]
+                });
             });
         }
+    });
+
+    // 重复技能全部编号：血仇1/血仇2，牵制1/牵制2...
+    const skillNameCounters = {};
+    skillEntries.forEach(entry => {
+        const total = skillNameTotals[entry.skillName];
+        skillNameCounters[entry.skillName] = (skillNameCounters[entry.skillName] || 0) + 1;
+
+        const finalSkillName = total > 1
+            ? `${entry.skillName}${skillNameCounters[entry.skillName]}`
+            : entry.skillName;
+
+        mergedConfig[finalSkillName] = {
+            ...entry.skillConfig,
+            baseName: entry.skillName,
+            sourceJob: entry.jobId
+        };
     });
 
     return mergedConfig;

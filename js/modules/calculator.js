@@ -4,7 +4,11 @@
  */
 class Calculator {
     constructor() {
-        this.skillsConfig = window.SKILL_CONSTANTS?.SKILLS_CONFIG || {};
+        // 技能配置会随职业选择动态变化，计算时实时读取当前配置。
+    }
+
+    get skillsConfig() {
+        return window.SKILL_CONSTANTS?.SKILLS_CONFIG || {};
     }
 
     /**
@@ -30,8 +34,8 @@ class Calculator {
                 const config = this.skillsConfig[skillName];
                 if (!config) return;
 
-                // 获取技能基础名称（去除数字后缀）
-                const baseSkillName = skillName.replace(/\d+$/, '');
+                // 获取技能基础名称（用于同名减伤去重）
+                const baseSkillName = config.baseName || skillName.replace(/\d+$/, '');
 
                 if (config.type === 1) {
                     // 乘法减伤 - 检查是否已经计算过该基础技能

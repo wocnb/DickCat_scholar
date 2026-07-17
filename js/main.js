@@ -58,10 +58,14 @@ class App {
         if (window.loadJobSelectionFromStorage) {
             const savedJobs = window.loadJobSelectionFromStorage();
             if (savedJobs) {
-                const selectedJobs = Object.values(savedJobs);
+                const selectedJobs = window.getSelectedJobIds
+                    ? window.getSelectedJobIds(savedJobs)
+                    : Object.values(savedJobs);
                 console.log('✓ 已加载保存的职业配置:', selectedJobs);
                 // 根据职业生成技能配置
-                if (window.SKILL_CONSTANTS?.updateSkillsConfigByJobs) {
+                if (window.skillsConfigManager) {
+                    window.skillsConfigManager.updateConfigByJob(selectedJobs);
+                } else if (window.SKILL_CONSTANTS?.updateSkillsConfigByJobs) {
                     window.SKILL_CONSTANTS.updateSkillsConfigByJobs(selectedJobs);
                 }
             }
@@ -158,6 +162,13 @@ window.TableAPI = {
      */
     clearAll: () => {
         dataHandler.clearAll();
+    },
+
+    /**
+     * 导入 FFLogs 承受伤害 CSV 并生成时间轴
+     */
+    importFFLogsCsv: () => {
+        fflogsCsvImporter.openFilePicker();
     },
 
     /**
