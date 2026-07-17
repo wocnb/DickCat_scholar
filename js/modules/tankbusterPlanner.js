@@ -538,14 +538,10 @@ class TankbusterPlanner {
         const inherited = !active && this.getInheritedResourceUse(row, resource);
         const schedule = this.getResourceSchedule(row, resource);
         const source = `${resource.sourceSlot.label} ${resource.sourceJob.name}`;
-        const mitigation = resource.type === 1
-            ? `${Math.round((1 - this.getResourceCoefficient(resource, row.damageKind)) * 100)}%`
-            : resource.type === 2
-                ? `盾 ${resource.coefficient.toLocaleString()}`
-                : `最大HP +${Math.round(resource.coefficient * 100)}%`;
+        const mitigation = this.getResourceMitigationLabel(resource, row);
         const availability = resource.repeatable
             ? '可重复施放'
-            : `CD ${resource.cooldown}s${resource.duration ? ` / 持续 ${resource.duration}s` : ''}`;
+            : `CD ${resource.cooldown}s${resource.charges > 1 ? ` / ${resource.charges}充能` : ''}${resource.duration ? ` / 持续 ${resource.duration}s` : ''}`;
         const scheduleText = !schedule.ready
             ? ` / 冷却至 ${this.formatTimelineTime(schedule.nextReadyAt)}`
             : inherited
@@ -573,6 +569,22 @@ class TankbusterPlanner {
             '扩散盾': '展开战术'
         };
         return `${aliases[skillName] || skillName}.png`;
+    }
+
+    getResourceMitigationLabel(resource, row) {
+        if (resource.type === 2) {
+            return resource.shieldMaxHpPercent
+                ? `盾 最大HP ${resource.shieldMaxHpPercent}%`
+                : `盾 ${resource.coefficient.toLocaleString()}`;
+        }
+
+        if (resource.type === 3) return `最大HP +${Math.round(resource.coefficient * 100)}%`;
+
+        const layers = resource.mitigationLayers || [];
+        const reduction = (1 - this.getResourceCoefficient(resource, row.damageKind)) * 100;
+        const layerText = layers.length > 1 ? `（${layers.join('% + ')}%）` : '';
+        const hpText = resource.maxHpPercent ? ` / 最大HP +${resource.maxHpPercent}%` : '';
+        return `${reduction % 1 ? reduction.toFixed(2) : Math.round(reduction)}%${layerText}${hpText}`;
     }
 
     getResourceFallbackLabel(skillName) {
@@ -612,11 +624,14 @@ class TankbusterPlanner {
             .reduce((multiplier, resource) => multiplier * this.getResourceCoefficient(resource, row.damageKind), 1);
         const shieldAmount = resources
             .filter(resource => resource.type === 2)
-            .reduce((total, resource) => total + resource.coefficient, 0);
-        const damage = (originalDamage * remainingMultiplier) - shieldAmount;
+            .reduce((total, resource) => total + this.getResourceShieldAmount(resource, row), 0);
+        const damage = Math.max(0, (originalDamage * remainingMultiplier) - shieldAmount);
         const maxHpMultiplier = resources
-            .filter(resource => resource.type === 3)
-            .reduce((multiplier, resource) => multiplier * (1 + resource.coefficient), 1);
+            .filter(resource => resource.type === 3 || resource.maxHpPercent)
+            .reduce((multiplier, resource) => {
+                const increase = resource.type === 3 ? resource.coefficient : resource.maxHpPercent / 100;
+                return multiplier * (1 + increase);
+            }, 1);
 
         return {
             damage,
@@ -641,6 +656,12 @@ class TankbusterPlanner {
         if (!rawLethal) return { kind: 'normal', text: `原始 U 未超过 ${hpText}，非死刑` };
         if (mitigatedLethal) return { kind: 'lethal', text: `原始致死；减伤后仍会去世（${hpText}）` };
         return { kind: 'survives', text: `原始致死；减伤后存活（${hpText}）` };
+    }
+
+    getResourceShieldAmount(resource, row) {
+        if (!resource.shieldMaxHpPercent) return resource.coefficient;
+        const target = this.getTankMembers().find(member => member.slot.key === row.targetSlot);
+        return target?.maxHp ? target.maxHp * resource.shieldMaxHpPercent / 100 : 0;
     }
 
     pruneUnavailableResources(row) {
@@ -722,6 +743,10 @@ class TankbusterPlanner {
             coefficient: Number(resource.coefficient),
             cooldown: Number(resource.cooldown) || 0,
             duration: Number(resource.duration) || 0,
+            charges: Math.max(1, Number(resource.charges) || 1),
+            mitigationLayers: Array.isArray(resource.mitigationLayers) ? resource.mitigationLayers : null,
+            maxHpPercent: Number(resource.maxHpPercent) || 0,
+            shieldMaxHpPercent: Number(resource.shieldMaxHpPercent) || 0,
             repeatable: Boolean(resource.repeatable),
             damageKind: resource.damageKind || 'all',
             effect: resource.effect || '团队减伤资源'
@@ -745,14 +770,21 @@ class TankbusterPlanner {
             return { ready: true, nextReadyAt: 0 };
         }
 
-        const previousUse = this.rows
+        const previousUses = this.rows
             .filter(candidate => candidate.id !== row.id && candidate.selectedResources.includes(resource.id))
             .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.time) }))
             .filter(candidate => Number.isFinite(candidate.time) && candidate.time <= rowTime)
-            .sort((left, right) => right.time - left.time)[0];
-        if (!previousUse) return { ready: true, nextReadyAt: 0 };
+            .sort((left, right) => left.time - right.time);
+        const nextChargeTimes = Array(resource.charges || 1).fill(0);
 
-        const nextReadyAt = previousUse.time + resource.cooldown;
+        previousUses.forEach(use => {
+            const earliestCharge = Math.min(...nextChargeTimes);
+            if (use.time < earliestCharge) return;
+            const chargeIndex = nextChargeTimes.indexOf(earliestCharge);
+            nextChargeTimes[chargeIndex] = use.time + resource.cooldown;
+        });
+
+        const nextReadyAt = Math.min(...nextChargeTimes);
         return { ready: rowTime >= nextReadyAt, nextReadyAt };
     }
 
@@ -799,14 +831,21 @@ class TankbusterPlanner {
     }
 }
 
-const percentResource = (name, percent, cooldown, effect, options = {}) => ({
-    name,
-    type: 1,
-    coefficient: Number((1 - percent / 100).toFixed(2)),
-    cooldown,
-    effect,
-    ...options
-});
+const percentResource = (name, percent, cooldown, effect, options = {}) => {
+    const mitigationLayers = options.mitigationLayers || [percent];
+    const coefficient = Number(mitigationLayers
+        .reduce((remaining, layer) => remaining * (1 - layer / 100), 1)
+        .toFixed(6));
+    return {
+        name,
+        type: 1,
+        coefficient,
+        cooldown,
+        effect,
+        ...options,
+        mitigationLayers
+    };
+};
 
 const shieldResource = (name, amount, cooldown, effect, options = {}) => ({
     name,
@@ -829,40 +868,43 @@ const maxHpResource = (name, percent, cooldown, duration, effect, options = {}) 
 
 const TANKBUSTER_SELF_RESOURCES = {
     pld: [
-        percentResource('铁壁', 20, 90, '自身受到伤害降低20%'),
-        percentResource('卫戍', 40, 120, '自身受到伤害降低40%'),
-        percentResource('神圣盾击', 15, 5, '自身受到伤害降低15%'),
-        percentResource('神圣领域', 100, 420, '免疫绝大多数攻击')
+        percentResource('铁壁', 20, 90, '自身受到伤害降低20%；额外提高自身受到治疗效果15%', { duration: 20 }),
+        percentResource('卫戍', 40, 120, '自身受到伤害降低40%，并获得相当于治疗量1,000 potency的护盾', { duration: 15 }),
+        percentResource('神圣盾阵', 15, 5, '8秒内受到伤害降低15%；前4秒额外获得骑士的坚守15%。按重叠阶段计算为27.75%减伤', { duration: 8, mitigationLayers: [15, 15] }),
+        percentResource('神圣领域', 100, 420, '免疫绝大多数攻击', { duration: 10 })
     ],
     drk: [
-        percentResource('铁壁', 20, 90, '自身受到伤害降低20%'),
-        percentResource('暗影墙', 30, 120, '自身受到伤害降低30%'),
-        percentResource('弃明投暗', 20, 60, '自身受到魔法伤害降低20%', { damageKind: 'magic' }),
-        shieldResource('至黑之夜', 25000, 15, '自身护盾估算值')
+        percentResource('铁壁', 20, 90, '自身受到伤害降低20%；额外提高自身受到治疗效果15%', { duration: 20 }),
+        percentResource('暗影卫', 40, 120, '自身受到伤害降低40%；生命低于50%或效果结束时恢复生命', { duration: 15 }),
+        percentResource('弃明投暗', 20, 60, '自身受到魔法伤害降低20%', { damageKind: 'magic', duration: 10 }),
+        percentResource('献奉', 10, 60, '自身受到伤害降低10%，2充能', { duration: 10, charges: 2 }),
+        shieldResource('至黑之夜', 0, 15, '为自身附加相当于最大HP 25%的护盾', { duration: 7, shieldMaxHpPercent: 25 }),
+        percentResource('行尸走肉', 100, 300, '不会使HP降至1以下', { duration: 10 })
     ],
     gnb: [
-        percentResource('铁壁', 20, 90, '自身受到伤害降低20%'),
-        percentResource('大星云', 40, 120, '自身受到伤害降低40%'),
-        percentResource('伪装', 10, 90, '自身受到伤害降低10%'),
-        percentResource('刚玉之心', 15, 25, '自身受到伤害降低15%'),
-        percentResource('超火流星', 100, 360, '将自身HP降至1，并使大部分伤害无效')
+        percentResource('铁壁', 20, 90, '自身受到伤害降低20%；额外提高自身受到治疗效果15%', { duration: 20 }),
+        percentResource('大星云', 40, 120, '自身受到伤害降低40%，最大HP提高20%并回复提高的生命值', { duration: 15, maxHpPercent: 20 }),
+        percentResource('伪装', 10, 90, '自身受到伤害降低10%，并提高招架率', { duration: 20 }),
+        percentResource('刚玉之心', 15, 25, '8秒内受到伤害降低15%；前4秒额外获得刚玉的清晰15%。按重叠阶段计算为27.75%减伤', { duration: 8, mitigationLayers: [15, 15] }),
+        percentResource('超火流星', 100, 360, '将自身HP降至1，并使大部分伤害无效', { duration: 10 })
     ],
     war: [
-        percentResource('铁壁', 20, 90, '自身受到伤害降低20%'),
-        percentResource('原初的血烟', 40, 120, '自身受到伤害降低40%'),
-        percentResource('原初的血气', 10, 25, '自身受到伤害降低10%'),
-        percentResource('死斗', 100, 240, '不会使HP降至1以下')
+        percentResource('铁壁', 20, 90, '自身受到伤害降低20%；额外提高自身受到治疗效果15%', { duration: 20 }),
+        percentResource('原初的血烟', 40, 120, '自身受到伤害降低40%；受到物理伤害时反击，结束后获得持续恢复', { duration: 15 }),
+        maxHpResource('战栗', 20, 90, 10, '最大HP提高20%，并回复提高的生命值'),
+        percentResource('原初的血气', 10, 25, '8秒内受到伤害降低10%；前4秒额外获得原初的刚毅10%。按重叠阶段计算为19%减伤', { duration: 8, mitigationLayers: [10, 10] }),
+        percentResource('死斗', 100, 240, '不会使HP降至1以下', { duration: 10 })
     ]
 };
 
 const TANKBUSTER_COTANK_RESOURCES = {
-    pld: [percentResource('干预', 20, 10, '对目标队员的减伤，按副坦开启大减伤时的20%估算')],
+    pld: [percentResource('干预', 10, 10, '目标受到伤害降低10%；若骑士自身开启铁壁或卫戍，额外10%；前4秒另有骑士的坚守10%。按最大重叠阶段计算为27.1%减伤', { duration: 8, mitigationLayers: [10, 10, 10] })],
     drk: [
-        percentResource('献奉', 10, 60, '目标队员受到伤害降低10%，2充能'),
-        shieldResource('至黑之夜', 25000, 15, '对目标队员的护盾估算值')
+        percentResource('献奉', 10, 60, '目标队员受到伤害降低10%，2充能', { duration: 10, charges: 2 }),
+        shieldResource('至黑之夜', 0, 15, '为目标附加相当于最大HP 25%的护盾', { duration: 7, shieldMaxHpPercent: 25 })
     ],
-    gnb: [percentResource('刚玉之心', 15, 25, '目标队员受到伤害降低15%')],
-    war: [percentResource('原初的血气', 10, 25, '目标队员受到伤害降低10%')]
+    gnb: [percentResource('刚玉之心', 15, 25, '8秒内目标受到伤害降低15%；前4秒额外获得刚玉的清晰15%。按重叠阶段计算为27.75%减伤', { duration: 8, mitigationLayers: [15, 15] })],
+    war: [percentResource('原初的勇猛', 10, 25, '8秒内目标受到伤害降低10%；前4秒额外获得原初的刚毅10%。按重叠阶段计算为19%减伤', { duration: 8, mitigationLayers: [10, 10] })]
 };
 
 const TANKBUSTER_HEALER_RESOURCES = {
