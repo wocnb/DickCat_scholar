@@ -9,6 +9,8 @@ class TankbusterPlanner {
         this.targetSlot = 'row0';
         this.initialized = false;
         this.sharedStoreInitialized = false;
+        this.memberProfiles = this.loadMemberProfiles();
+        this.collapsedPanels = { row0: false, row1: false };
         this.categoryLabels = {
             self: '自身减伤',
             cotank: '副坦辅助',
@@ -64,10 +66,10 @@ class TankbusterPlanner {
         if (isComprehensive) window.comprehensiveTimeline?.render();
     }
 
-    addRow() {
+    addRow(targetSlot = this.targetSlot) {
         this.rows.push({
             id: this.rowIdCounter++,
-            targetSlot: this.targetSlot,
+            targetSlot,
             time: '',
             name: '',
             damage: '',
@@ -152,25 +154,56 @@ class TankbusterPlanner {
         ));
         comprehensiveTimeline.resolveTankImmuneDamage(events);
 
-        const importedRows = events
+        const lethalEvents = events
             .filter(event => Number.isFinite(event.damage))
+            .filter(event => {
+                const target = this.getTankMembers().find(member => member.slot.key === event.source.targetSlot);
+                return !target?.maxHp || event.damage > target.maxHp;
+            })
             .sort((left, right) => left.seconds - right.seconds || left.order - right.order)
+        const mergedEvents = this.mergeTankEventsByTime(lethalEvents);
+        const importedRows = this.getTankMembers().flatMap(target => mergedEvents
             .map(event => ({
                 id: this.rowIdCounter++,
-                targetSlot: event.source.targetSlot,
+                targetSlot: target.slot.key,
                 time: event.time,
                 name: event.name,
                 damage: event.damage,
                 damageMode: 'solo',
                 splitCount: 2,
                 damageKind: event.damageKind || 'all',
+                importSources: event.importSources,
                 selectedResources: []
-            }));
+            })));
 
         this.rows = importedRows;
         this.rowIdCounter = Math.max(this.rowIdCounter, importedRows.length);
         this.refreshResources();
-        alert(`已从 ${files.length} 个 MT/ST CSV 生成 ${importedRows.length} 条死刑记录。`);
+        alert(`已合并 ${files.length} 个 MT/ST CSV，按时间去重后得到 ${mergedEvents.length} 条候选死刑，并分别复制到 MT/ST 两个窗口。未设置坦克血量时会保留全部记录；设置后仅纳入 U 超过原承伤坦克血量上限的技能。`);
+    }
+
+    mergeTankEventsByTime(events) {
+        const tolerance = 0.5;
+        return events.reduce((merged, event) => {
+            const current = merged[merged.length - 1];
+            if (!current || Math.abs(current.seconds - event.seconds) > tolerance) {
+                merged.push({
+                    ...event,
+                    importSources: [event.source.targetSlot]
+                });
+                return merged;
+            }
+
+            current.importSources = [...new Set([...current.importSources, event.source.targetSlot])];
+            if (event.damage > current.damage) {
+                current.name = event.name;
+                current.damage = event.damage;
+                current.time = event.time;
+                current.seconds = event.seconds;
+                current.damageKind = event.damageKind;
+            }
+            return merged;
+        }, []);
     }
 
     deleteRow(rowId) {
@@ -194,7 +227,7 @@ class TankbusterPlanner {
         row[field] = field === 'splitCount'
             ? Math.max(2, Number(value) || 2)
             : value;
-        if (field === 'damageKind' || field === 'targetSlot') {
+        if (field === 'damageKind' || field === 'targetSlot' || field === 'time') {
             this.pruneUnavailableResources(row);
             this.renderRows();
             return;
@@ -215,6 +248,15 @@ class TankbusterPlanner {
     toggleResource(rowId, resourceId) {
         const row = this.rows.find(item => item.id === rowId);
         if (!row) return;
+
+        const resource = this.getAvailableResources(row).find(item => item.id === resourceId);
+        if (!resource) return;
+
+        if (!row.selectedResources.includes(resourceId) && !this.isResourceReadyForRow(row, resource)) {
+            const schedule = this.getResourceSchedule(row, resource);
+            alert(`${resource.name} 仍在冷却中，预计 ${this.formatTimelineTime(schedule.nextReadyAt)} 后可再次使用。`);
+            return;
+        }
 
         row.selectedResources = row.selectedResources.includes(resourceId)
             ? row.selectedResources.filter(id => id !== resourceId)
@@ -249,7 +291,7 @@ class TankbusterPlanner {
         if (!summary) return;
 
         summary.innerHTML = this.getPartyMembers().map(member => `
-            <span class="party-member ${member.slot.role}">${member.slot.label} ${this.escapeHtml(member.job.name)}</span>
+            <span class="party-member ${member.slot.role}" title="${this.escapeHtml(member.job.name)} / 血量上限 ${member.maxHp || '待设置'}">${member.slot.label} ${this.escapeHtml(member.name)} · ${member.maxHp ? member.maxHp.toLocaleString() : 'HP 待设置'}</span>
         `).join('');
     }
 
@@ -257,18 +299,57 @@ class TankbusterPlanner {
         const container = document.getElementById('tankbusterRows');
         if (!container) return;
 
-        if (!this.rows.length) {
-            container.innerHTML = '<div class="tankbuster-empty">暂无死刑条目</div>';
+        const tanks = this.getTankMembers();
+        if (!tanks.length) {
+            container.innerHTML = '<div class="tankbuster-empty">请先在职业选择中配置两名坦克</div>';
             return;
         }
 
-        container.innerHTML = this.rows.map(row => this.renderRow(row)).join('');
+        container.innerHTML = tanks.map(tank => this.renderTankPanel(tank)).join('');
+    }
+
+    renderTankPanel(tank) {
+        const rows = this.rows
+            .filter(row => row.targetSlot === tank.slot.key)
+            .sort((left, right) => this.parseTimelineTime(left.time) - this.parseTimelineTime(right.time));
+        const position = tank.slot.key === 'row0' ? 'MT' : 'ST';
+        const hpLabel = tank.maxHp ? `HP ${tank.maxHp.toLocaleString()}` : 'HP 待设置';
+        const collapsed = Boolean(this.collapsedPanels[tank.slot.key]);
+
+        return `
+            <section class="tankbuster-target-panel ${position.toLowerCase()} ${collapsed ? 'is-collapsed' : ''}">
+                <header class="tankbuster-target-header">
+                    <div>
+                        <span class="tankbuster-target-role">${position}</span>
+                        <strong>${this.escapeHtml(tank.name)}</strong>
+                        <small>${this.escapeHtml(tank.job.name)} · ${hpLabel}</small>
+                    </div>
+                    <div class="tankbuster-target-actions">
+                        <button class="btn btn-primary btn-sm" type="button" onclick="tankbusterPlanner.addRow('${tank.slot.key}')">添加死刑</button>
+                        <button class="tankbuster-collapse-button" type="button" title="${collapsed ? '展开' : '折叠'} ${position}" aria-label="${collapsed ? '展开' : '折叠'} ${position}" aria-expanded="${String(!collapsed)}" onclick="tankbusterPlanner.togglePanel('${tank.slot.key}')">${collapsed ? '>' : 'v'}</button>
+                    </div>
+                </header>
+                ${collapsed ? '' : `
+                    <div class="tankbuster-target-rows">
+                        ${rows.length
+                            ? rows.map(row => this.renderRow(row)).join('')
+                            : '<div class="tankbuster-empty">暂无死刑条目</div>'}
+                    </div>
+                `}
+            </section>
+        `;
+    }
+
+    togglePanel(slotKey) {
+        this.collapsedPanels[slotKey] = !this.collapsedPanels[slotKey];
+        this.renderRows();
     }
 
     renderRow(row) {
         const resources = this.getAvailableResources(row);
-        const selected = resources.filter(resource => row.selectedResources.includes(resource.id));
+        const selected = this.getAppliedResources(row, resources);
         const calculation = this.calculateDamage(row, selected);
+        const deathStatus = this.getDeathStatus(row, calculation);
 
         return `
             <article class="tankbuster-row" id="tankbuster-row-${row.id}">
@@ -277,15 +358,9 @@ class TankbusterPlanner {
                         <span>时间</span>
                         <input type="text" value="${this.escapeHtml(row.time)}" placeholder="如 1m30s" onblur="tankbusterPlanner.updateRow(${row.id}, 'time', this.value)">
                     </label>
-                    <label class="tankbuster-field">
-                        <span>目标坦克</span>
-                        <select onchange="tankbusterPlanner.updateRow(${row.id}, 'targetSlot', this.value)">
-                            ${this.renderTankOptions(row.targetSlot)}
-                        </select>
-                    </label>
                     <label class="tankbuster-field tankbuster-name-field">
-                        <span>死刑技能</span>
-                        <input type="text" value="${this.escapeHtml(row.name)}" placeholder="技能名称" onblur="tankbusterPlanner.updateRow(${row.id}, 'name', this.value)">
+                        <span>技能</span>
+                        <input type="text" value="${this.escapeHtml(row.name)}" title="${this.escapeHtml(row.name)}" placeholder="技能名称" onblur="tankbusterPlanner.updateRow(${row.id}, 'name', this.value)">
                     </label>
                     <label class="tankbuster-field">
                         <span>伤害</span>
@@ -311,7 +386,7 @@ class TankbusterPlanner {
                         </select>
                     </label>
                     <div class="tankbuster-result" id="tankbuster-result-${row.id}">
-                        ${this.renderResultMarkup(calculation)}
+                        ${this.renderResultMarkup(calculation, deathStatus)}
                     </div>
                     <button class="btn btn-danger btn-sm" type="button" onclick="tankbusterPlanner.deleteRow(${row.id})">删除</button>
                 </div>
@@ -335,8 +410,113 @@ class TankbusterPlanner {
 
     renderTankOptions(selectedSlot) {
         return this.getTankMembers().map(member => `
-            <option value="${member.slot.key}" ${member.slot.key === selectedSlot ? 'selected' : ''}>${member.slot.label} - ${this.escapeHtml(member.job.name)}</option>
+            <option value="${member.slot.key}" ${member.slot.key === selectedSlot ? 'selected' : ''}>${member.slot.label}</option>
         `).join('');
+    }
+
+    loadMemberProfiles() {
+        const profiles = {};
+        const slots = window.PARTY_SLOTS || [];
+
+        try {
+            const saved = JSON.parse(localStorage.getItem('tankbusterMemberProfiles') || '{}');
+            slots.forEach(slot => {
+                profiles[slot.key] = {
+                    name: String(saved[slot.key]?.name || slot.label).trim() || slot.label,
+                    maxHp: Math.max(0, Number(saved[slot.key]?.maxHp) || 0)
+                };
+            });
+        } catch (error) {
+            slots.forEach(slot => {
+                profiles[slot.key] = { name: slot.label, maxHp: 0 };
+            });
+        }
+
+        return profiles;
+    }
+
+    openPartySettings() {
+        const existing = document.getElementById('party-member-settings-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'party-member-settings-modal';
+        modal.className = 'job-modal-overlay';
+        modal.innerHTML = `
+            <div class="job-modal-content party-settings-modal">
+                <div class="job-modal-header">
+                    <div>
+                        <h2>队伍成员与血量</h2>
+                        <div class="job-modal-subtitle">名称可自定义；坦克血量用于死刑判定</div>
+                    </div>
+                    <button class="job-close-btn" type="button" onclick="tankbusterPlanner.closePartySettings()">✕</button>
+                </div>
+                <div class="party-settings-list">
+                    ${(window.PARTY_SLOTS || []).map(slot => {
+                        const profile = this.memberProfiles[slot.key] || { name: slot.label, maxHp: 0 };
+                        const member = this.getPartyMembers().find(item => item.slot.key === slot.key);
+                        return `
+                            <label class="party-settings-row">
+                                <span>${slot.label} ${member ? this.escapeHtml(member.job.name) : ''}</span>
+                                <input id="party-name-${slot.key}" type="text" value="${this.escapeHtml(profile.name)}" aria-label="${slot.label} 名称">
+                                <input id="party-hp-${slot.key}" type="number" min="0" step="1" value="${profile.maxHp || ''}" placeholder="血量上限" aria-label="${slot.label} 血量上限">
+                            </label>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="job-modal-footer">
+                    <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.closePartySettings()">取消</button>
+                    <button class="btn btn-primary" type="button" onclick="tankbusterPlanner.saveMemberProfiles()">保存</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    closePartySettings() {
+        document.getElementById('party-member-settings-modal')?.remove();
+    }
+
+    saveMemberProfiles() {
+        (window.PARTY_SLOTS || []).forEach(slot => {
+            const name = document.getElementById(`party-name-${slot.key}`)?.value.trim();
+            const maxHp = Number(document.getElementById(`party-hp-${slot.key}`)?.value) || 0;
+            this.memberProfiles[slot.key] = { name: name || slot.label, maxHp: Math.max(0, maxHp) };
+        });
+
+        try {
+            localStorage.setItem('tankbusterMemberProfiles', JSON.stringify(this.memberProfiles));
+        } catch (error) {
+            console.warn('无法保存队伍血量设置:', error);
+        }
+
+        this.closePartySettings();
+        this.refreshResources();
+        if (window.damageCsvStore?.has('mt') || window.damageCsvStore?.has('st')) {
+            this.replaceRowsFromTankCsv();
+        }
+    }
+
+    getMemberProfiles() {
+        return JSON.parse(JSON.stringify(this.memberProfiles));
+    }
+
+    setMemberProfiles(profiles) {
+        (window.PARTY_SLOTS || []).forEach(slot => {
+            const profile = profiles?.[slot.key] || {};
+            this.memberProfiles[slot.key] = {
+                name: String(profile.name || slot.label).trim() || slot.label,
+                maxHp: Math.max(0, Number(profile.maxHp) || 0)
+            };
+        });
+
+        try {
+            localStorage.setItem('tankbusterMemberProfiles', JSON.stringify(this.memberProfiles));
+        } catch (error) {
+            console.warn('无法保存队伍血量设置:', error);
+        }
+
+        this.refreshResources();
     }
 
     renderResourceGroup(row, category, resources) {
@@ -355,27 +535,51 @@ class TankbusterPlanner {
 
     renderResourceButton(row, resource) {
         const active = row.selectedResources.includes(resource.id);
+        const inherited = !active && this.getInheritedResourceUse(row, resource);
+        const schedule = this.getResourceSchedule(row, resource);
         const source = `${resource.sourceSlot.label} ${resource.sourceJob.name}`;
         const mitigation = resource.type === 1
             ? `${Math.round((1 - this.getResourceCoefficient(resource, row.damageKind)) * 100)}%`
-            : `盾 ${resource.coefficient.toLocaleString()}`;
-        const availability = resource.repeatable ? '可重复施放' : `CD ${resource.cooldown}s`;
-        const title = `${resource.name} / ${source} / ${availability}\n${resource.effect}`;
+            : resource.type === 2
+                ? `盾 ${resource.coefficient.toLocaleString()}`
+                : `最大HP +${Math.round(resource.coefficient * 100)}%`;
+        const availability = resource.repeatable
+            ? '可重复施放'
+            : `CD ${resource.cooldown}s${resource.duration ? ` / 持续 ${resource.duration}s` : ''}`;
+        const scheduleText = !schedule.ready
+            ? ` / 冷却至 ${this.formatTimelineTime(schedule.nextReadyAt)}`
+            : inherited
+                ? ` / 由 ${inherited.row.time} 的施放覆盖`
+                : '';
+        const title = `${resource.name} / ${source} / ${mitigation} / ${availability}${scheduleText}\n${resource.effect}`;
+        const imageName = this.getResourceImageName(resource.name);
 
         return `
             <button
-                class="tank-resource ${active ? 'active' : ''}"
+                class="tank-resource ${active ? 'active' : ''} ${inherited ? 'covered' : ''} ${!active && !schedule.ready ? 'on-cooldown' : ''}"
                 type="button"
                 title="${this.escapeHtml(title)}"
+                aria-label="${this.escapeHtml(title)}"
                 onclick="tankbusterPlanner.toggleResource(${row.id}, '${resource.id}')"
             >
-                <span>${this.escapeHtml(resource.name)}</span>
-                <small>${source} · ${mitigation}${resource.repeatable ? ' · 可重复' : ''}</small>
+                <img src="figs/skills/${this.escapeHtml(imageName)}" alt="" onerror="this.hidden = true; this.nextElementSibling.hidden = false;">
+                <span class="tank-resource-fallback" hidden>${this.escapeHtml(this.getResourceFallbackLabel(resource.name))}</span>
             </button>
         `;
     }
 
-    renderResultMarkup(calculation) {
+    getResourceImageName(skillName) {
+        const aliases = {
+            '扩散盾': '展开战术'
+        };
+        return `${aliases[skillName] || skillName}.png`;
+    }
+
+    getResourceFallbackLabel(skillName) {
+        return String(skillName).replace(/\d+$/, '').slice(0, 2);
+    }
+
+    renderResultMarkup(calculation, deathStatus) {
         const sourceDamage = calculation.multiplier > 1
             ? `U ${calculation.rawDamage.toFixed(2)} × ${calculation.multiplier} = ${calculation.effectiveDamage.toFixed(2)}`
             : `U ${calculation.effectiveDamage.toFixed(2)}`;
@@ -384,6 +588,7 @@ class TankbusterPlanner {
             <strong>${calculation.damage.toFixed(2)}</strong>
             <small>${sourceDamage}</small>
             <small>-5% ${calculation.low.toFixed(2)} / +5% ${calculation.high.toFixed(2)}</small>
+            <small class="tankbuster-death-status ${deathStatus.kind}">${deathStatus.text}</small>
         `;
     }
 
@@ -391,9 +596,9 @@ class TankbusterPlanner {
         const element = document.getElementById(`tankbuster-result-${row.id}`);
         if (!element) return;
 
-        const selected = this.getAvailableResources(row)
-            .filter(resource => row.selectedResources.includes(resource.id));
-        element.innerHTML = this.renderResultMarkup(this.calculateDamage(row, selected));
+        const resources = this.getAvailableResources(row);
+        const calculation = this.calculateDamage(row, this.getAppliedResources(row, resources));
+        element.innerHTML = this.renderResultMarkup(calculation, this.getDeathStatus(row, calculation));
     }
 
     calculateDamage(row, resources) {
@@ -409,6 +614,9 @@ class TankbusterPlanner {
             .filter(resource => resource.type === 2)
             .reduce((total, resource) => total + resource.coefficient, 0);
         const damage = (originalDamage * remainingMultiplier) - shieldAmount;
+        const maxHpMultiplier = resources
+            .filter(resource => resource.type === 3)
+            .reduce((multiplier, resource) => multiplier * (1 + resource.coefficient), 1);
 
         return {
             damage,
@@ -416,8 +624,23 @@ class TankbusterPlanner {
             high: damage * 1.05,
             rawDamage,
             multiplier,
-            effectiveDamage: originalDamage
+            effectiveDamage: originalDamage,
+            maxHpMultiplier
         };
+    }
+
+    getDeathStatus(row, calculation) {
+        const target = this.getTankMembers().find(member => member.slot.key === row.targetSlot);
+        if (!target?.maxHp) return { kind: 'pending', text: '血量上限待设置，无法判断死刑' };
+
+        const rawLethal = calculation.effectiveDamage > target.maxHp;
+        const effectiveMaxHp = target.maxHp * calculation.maxHpMultiplier;
+        const mitigatedLethal = calculation.damage > effectiveMaxHp;
+        const hpText = `HP ${effectiveMaxHp.toLocaleString()}`;
+
+        if (!rawLethal) return { kind: 'normal', text: `原始 U 未超过 ${hpText}，非死刑` };
+        if (mitigatedLethal) return { kind: 'lethal', text: `原始致死；减伤后仍会去世（${hpText}）` };
+        return { kind: 'survives', text: `原始致死；减伤后存活（${hpText}）` };
     }
 
     pruneUnavailableResources(row) {
@@ -437,6 +660,24 @@ class TankbusterPlanner {
         ];
 
         return resources.filter(resource => this.isResourceCompatible(resource, row.damageKind));
+    }
+
+    getAppliedResources(row, resources) {
+        const direct = resources.filter(resource => row.selectedResources.includes(resource.id));
+        const inherited = resources.filter(resource => !row.selectedResources.includes(resource.id)
+            && this.getInheritedResourceUse(row, resource));
+        return [...direct, ...inherited];
+    }
+
+    getInheritedResourceUse(row, resource) {
+        const rowTime = this.parseTimelineTime(row.time);
+        if (!Number.isFinite(rowTime) || !resource.duration) return null;
+
+        return this.rows
+            .filter(candidate => candidate.id !== row.id && candidate.selectedResources.includes(resource.id))
+            .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.time) }))
+            .filter(candidate => Number.isFinite(candidate.time) && candidate.time <= rowTime && rowTime - candidate.time <= resource.duration)
+            .sort((left, right) => right.time - left.time)[0] || null;
     }
 
     getCoTankResources(target) {
@@ -480,6 +721,7 @@ class TankbusterPlanner {
             type: resource.type || 1,
             coefficient: Number(resource.coefficient),
             cooldown: Number(resource.cooldown) || 0,
+            duration: Number(resource.duration) || 0,
             repeatable: Boolean(resource.repeatable),
             damageKind: resource.damageKind || 'all',
             effect: resource.effect || '团队减伤资源'
@@ -497,12 +739,48 @@ class TankbusterPlanner {
         return resource.coefficient;
     }
 
+    getResourceSchedule(row, resource) {
+        const rowTime = this.parseTimelineTime(row.time);
+        if (!Number.isFinite(rowTime) || !resource.cooldown || resource.repeatable) {
+            return { ready: true, nextReadyAt: 0 };
+        }
+
+        const previousUse = this.rows
+            .filter(candidate => candidate.id !== row.id && candidate.selectedResources.includes(resource.id))
+            .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.time) }))
+            .filter(candidate => Number.isFinite(candidate.time) && candidate.time <= rowTime)
+            .sort((left, right) => right.time - left.time)[0];
+        if (!previousUse) return { ready: true, nextReadyAt: 0 };
+
+        const nextReadyAt = previousUse.time + resource.cooldown;
+        return { ready: rowTime >= nextReadyAt, nextReadyAt };
+    }
+
+    isResourceReadyForRow(row, resource) {
+        return this.getResourceSchedule(row, resource).ready;
+    }
+
+    parseTimelineTime(value) {
+        const text = String(value || '').trim();
+        const minuteMatch = text.match(/^(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?$/i);
+        if (minuteMatch && (minuteMatch[1] || minuteMatch[2])) {
+            return (Number(minuteMatch[1]) || 0) * 60 + (Number(minuteMatch[2]) || 0);
+        }
+        return fflogsCsvImporter?.parseTime(text);
+    }
+
+    formatTimelineTime(seconds) {
+        return fflogsCsvImporter?.formatTimelineTime(seconds) || `${seconds}s`;
+    }
+
     getPartyMembers() {
         const selection = window.getJobSelection?.() || {};
         return (window.PARTY_SLOTS || []).map(slot => {
             const jobId = selection[slot.key];
             const job = (window.JOBS || []).find(item => item.id === jobId);
-            return job ? { slot, job } : null;
+            if (!job) return null;
+            const profile = this.memberProfiles[slot.key] || { name: slot.label, maxHp: 0 };
+            return { slot, job, name: profile.name, maxHp: profile.maxHp };
         }).filter(Boolean);
     }
 
@@ -535,6 +813,16 @@ const shieldResource = (name, amount, cooldown, effect, options = {}) => ({
     type: 2,
     coefficient: amount,
     cooldown,
+    effect,
+    ...options
+});
+
+const maxHpResource = (name, percent, cooldown, duration, effect, options = {}) => ({
+    name,
+    type: 3,
+    coefficient: Number((percent / 100).toFixed(2)),
+    cooldown,
+    duration,
     effect,
     ...options
 });
@@ -578,18 +866,18 @@ const TANKBUSTER_COTANK_RESOURCES = {
 };
 
 const TANKBUSTER_HEALER_RESOURCES = {
-    sch: [shieldResource('鼓舞激励之策', 24000, 0, '单体鼓舞护盾估算值')],
+    sch: [maxHpResource('生命回生法', 10, 60, 10, '目标最大HP提高10%，并回复提高的生命值；同时提高受到的治疗效果10%')],
     sge: [
-        percentResource('均衡清汁', 10, 45, '目标队员受到伤害降低10%'),
-        shieldResource('寄生清汁', 30000, 120, '单体多层护盾估算值')
+        percentResource('均衡清汁', 10, 45, '目标队员受到伤害降低10%，持续15秒', { duration: 15 }),
+        shieldResource('寄生清汁', 30000, 120, '单体多层护盾估算值，持续15秒', { duration: 15 })
     ],
     whm: [
-        percentResource('水流幕', 15, 60, '目标队员受到伤害降低15%'),
-        shieldResource('神祝祷', 18000, 30, '单体护盾估算值')
+        percentResource('水流幕', 10, 60, '目标队员受到伤害降低10%，持续8秒', { duration: 8 }),
+        shieldResource('神祝祷', 18000, 30, '单体护盾估算值，持续30秒', { duration: 30 })
     ],
     ast: [
-        percentResource('擢升', 10, 60, '目标队员受到伤害降低10%'),
-        shieldResource('天星交错', 18000, 30, '单体护盾估算值')
+        percentResource('擢升', 10, 60, '目标队员受到伤害降低10%，持续8秒', { duration: 8 }),
+        shieldResource('天星交错', 18000, 30, '单体护盾估算值，持续30秒', { duration: 30 })
     ]
 };
 

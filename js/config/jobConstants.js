@@ -523,7 +523,8 @@ function createSkill(type, coefficient, cooldown, effect, options = {}) {
         scope: options.scope || 'party',
         damageKind: options.damageKind || 'all',
         repeatable: Boolean(options.repeatable),
-        damageCoefficients: options.damageCoefficients || null
+        damageCoefficients: options.damageCoefficients || null,
+        duration: Number(options.duration) || 0
     };
 }
 

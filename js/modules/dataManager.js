@@ -102,7 +102,8 @@ class DataManager {
                 version: '1.0.0',
                 exportedAt: new Date().toISOString(),
                 dataCount: this.tableData.length,
-                jobSelection: jobSelection
+                jobSelection: jobSelection,
+                memberProfiles: window.tankbusterPlanner?.getMemberProfiles()
             },
             data: this.tableData.map(row => ({
                 string: row.string,
@@ -128,12 +129,14 @@ class DataManager {
         // 处理包含meta的新格式
         let dataArray = configData;
         let jobSelection = null;
+        let memberProfiles = null;
 
         if (configData && typeof configData === 'object' && !Array.isArray(configData)) {
             // 新格式：{meta: {...}, data: [...]}
             if (configData.meta && configData.meta.jobSelection) {
                 jobSelection = configData.meta.jobSelection;
             }
+            memberProfiles = configData.meta?.memberProfiles || null;
             dataArray = configData.data || [];
         }
 
@@ -167,6 +170,10 @@ class DataManager {
             window.comprehensiveTimeline?.render();
 
             console.log('✓ 已从导出数据加载职业配置:', jobSelection);
+        }
+
+        if (memberProfiles) {
+            window.tankbusterPlanner?.setMemberProfiles(memberProfiles);
         }
 
         return this.tableData;

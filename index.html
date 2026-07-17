@@ -69,6 +69,7 @@
                 </label>
                 <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.openTankCsvPicker('row0')">导入 MT CSV</button>
                 <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.openTankCsvPicker('row1')">导入 ST CSV</button>
+                <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.openPartySettings()">队伍血量</button>
                 <input id="mtTankCsvInput" type="file" accept=".csv,text/csv" hidden onchange="tankbusterPlanner.importTankCsv(this.files[0], 'row0'); this.value = '';">
                 <input id="stTankCsvInput" type="file" accept=".csv,text/csv" hidden onchange="tankbusterPlanner.importTankCsv(this.files[0], 'row1'); this.value = '';">
                 <div id="tankbusterPartySummary" class="tankbuster-party-summary"></div>
