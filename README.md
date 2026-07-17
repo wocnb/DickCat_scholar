@@ -16,8 +16,10 @@
 
 - ✅ **减伤计算** - 支持13种乘法减伤 + 3种减法减伤喵
 - ✅ **实时预览** - 即时显示剩余伤害，方便调整减伤时轴喵
+- ✅ **职业选择** - 支持选择2个T、2个奶、4个DPS，并自动导入对应职业减伤喵
 - ✅ **配置管理** - 自动加载配置文件，支持导出自定义配置喵
 - ✅ **数据导出** - 一键导出JS配置文件，可直接分享给队友喵
+- ✅ **FFLogs 时间轴导入** - 导入承受伤害 CSV，按 `U` 未减伤值生成时间轴，并显示 ±5% 伤害范围喵
 - ✅ **界面紧凑** - 优化UI高度，一页显示更多数据喵
 
 ---
@@ -43,7 +45,7 @@ xdg-open index.html # Linux
 
 ### 2. 添加配置喵
 
-如果你想添加新的副本配置，只需 **2步** 喵：
+如果你想添加新的副本配置，只需 **3步** 喵：
 
 #### 步骤1：创建配置文件喵
 
@@ -62,15 +64,23 @@ const YOUR_CONFIG_DATA = [
         string: "17s",
         chineseText: "补天之手",
         number: "400000",
-        type1States: [true, true, false, false, false, false, false, false, false, false, false, false, false],
-        type2States: [true, true, false],
+        skills: {
+            "血仇1": true,
+            "牵制1": true,
+            "病毒": true,
+            "野战治疗阵": true,
+            "圣光幕帘": false,
+            "群盾": true,
+            "扩散盾": false
+        },
         summary: 177693.65
     }
 ];
 
+window.TABLE_CONFIGS = window.TABLE_CONFIGS || {};
 window.TABLE_CONFIGS.your_config = {
     meta: YOUR_CONFIG_META,
-    data: YOUR_CONFIG_DATA_DATA
+    data: YOUR_CONFIG_DATA
 };
 ```
 
@@ -108,6 +118,14 @@ const CONFIG_FILES = [
 3. 表格会自动填充该副本的减伤轴数据喵
 4. 状态栏会显示"成功加载xxx配置"喵
 
+### 导入 FFLogs 承受伤害 CSV 喵
+
+1. 点击"导入 FFLogs CSV"按钮，选择 FFLogs 导出的承受伤害 `.csv` 文件喵
+2. 系统会读取实际命中的承伤事件，跳过 `prepares` 准备读条记录喵
+3. 每条时间轴的技能伤害使用事件中的 `U` 未减伤值喵
+4. 确认导入后会覆盖当前表格，并自动保留当前职业对应的减伤技能按钮喵
+5. 剩余伤害列会显示减伤后的结果，以及 `-5%` 到 `+5%` 的伤害浮动范围喵
+
 ### 导出数据喵
 
 1. 编辑完减伤轴后，点击"导出数据喵"按钮喵
@@ -121,10 +139,10 @@ const CONFIG_FILES = [
 
 ### 乘法减伤（13种）喵
 
-乘法减伤按顺序叠加，计算公式喵：
+乘法减伤按顺序叠加。当前代码中，`coefficient` 表示 **剩余伤害倍率**，例如 10% 减伤写 `0.90` 喵：
 
 ```
-乘法减伤后伤害 = 原始伤害 × (1 - 减伤1) × (1 - 减伤2) × ... × (1 - 减伤13)
+乘法减伤后伤害 = 原始伤害 × 技能1倍率 × 技能2倍率 × ... × 技能N倍率
 ```
 
 **常用乘法减伤** 喵：
@@ -132,7 +150,7 @@ const CONFIG_FILES = [
 - **牵制** - 5%
 - **野战治疗阵** - 10%
 - **疾风怒涛之计** - 10%
-- **光之心** - 10%
+- **光之心** - 15%
 - 其他8种减伤喵...
 
 ### 减法减伤（3种）喵
@@ -144,8 +162,9 @@ const CONFIG_FILES = [
 ```
 
 **常用减法减伤** 喵：
-- **防护** - 固定减伤
-- **其他减法减伤** - 根据装备和Buff喵
+- **圣光幕帘** - 固定减伤
+- **群盾** - 固定减伤
+- **扩散盾** - 固定减伤
 
 ### 完整计算流程喵
 
@@ -223,9 +242,9 @@ DickCat_scholar-main/
 
 如果你想扩展功能，可以查看以下文档喵：
 
-- **REFACTORING.md** - 代码重构和架构说明喵
-- **AUTO_CONFIG_GUIDE.md** - 自动配置系统详解喵
-- **QUICK_REFERENCE.md** - 快速参考手册喵
+- **[REFACTORING.md](REFACTORING.md)** - 代码重构和架构说明喵
+- **[AUTO_CONFIG_GUIDE.md](AUTO_CONFIG_GUIDE.md)** - 自动配置系统详解喵
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - 快速参考手册喵
 
 ### 代码规范喵
 
@@ -254,14 +273,14 @@ DickCat_scholar-main/
 
 ### Q3: 如何修改减伤系数喵？
 
-**A:** 减伤系数在 `js/modules/calculator.js` 中定义喵，你可以根据实际需求修改喵：
+**A:** 默认减伤系数在 `js/config/skillConstants.js` 中定义喵。运行时也可以通过 `TableAPI.skills.update` 更新单个技能喵：
 
 ```javascript
-// 修改乘法减伤系数
-calculator.updateType1Coefficients([0.2, 0.1, 0.1, ...]);
-
-// 修改减法减伤系数
-calculator.updateType2Coefficients([1000, 2000, 3000]);
+TableAPI.skills.update("血仇1", {
+    cooldown: 60,
+    type: 1,
+    coefficient: 0.90
+});
 ```
 
 ### Q4: 表格行可以调整高度吗喵？
