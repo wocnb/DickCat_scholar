@@ -25,6 +25,7 @@ class DataManager {
             string: '',
             chineseText: '',
             number: '',
+            damageKind: 'all',
             skills: skills,
             summary: 0
         };
@@ -107,6 +108,7 @@ class DataManager {
                 string: row.string,
                 chineseText: row.chineseText,
                 number: row.number,
+                damageKind: row.damageKind || 'all',
                 skills: { ...row.skills },
                 summary: row.summary
             }))
@@ -142,6 +144,7 @@ class DataManager {
                 string: item.string || '',
                 chineseText: item.chineseText || '',
                 number: item.number || '',
+                damageKind: item.damageKind || 'all',
                 skills: item.skills ? { ...item.skills } : {},
                 summary: item.summary || 0
             };
@@ -159,6 +162,9 @@ class DataManager {
             if (window.jobSelector && window.jobSelector.setSelection) {
                 window.jobSelector.setSelection(jobSelection);
             }
+
+            window.tankbusterPlanner?.refreshResources();
+            window.comprehensiveTimeline?.render();
 
             console.log('✓ 已从导出数据加载职业配置:', jobSelection);
         }

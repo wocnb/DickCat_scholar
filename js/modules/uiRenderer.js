@@ -70,6 +70,13 @@ class UIRenderer {
                 </div>
             </td>
             <td>
+                <select class="damage-kind-select" aria-label="伤害属性" onchange="dataHandler.updateDamageKind(${rowData.id}, this.value)">
+                    <option value="all" ${rowData.damageKind === 'all' ? 'selected' : ''}>待选择</option>
+                    <option value="physical" ${rowData.damageKind === 'physical' ? 'selected' : ''}>物理</option>
+                    <option value="magic" ${rowData.damageKind === 'magic' ? 'selected' : ''}>魔法</option>
+                </select>
+            </td>
+            <td>
                 <div class="interactive-cell type1" id="type1-${rowData.id}">
                     <!-- 乘法减伤技能将动态生成 -->
                 </div>

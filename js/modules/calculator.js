@@ -36,11 +36,12 @@ class Calculator {
 
                 // 获取技能基础名称（用于同名减伤去重）
                 const baseSkillName = config.baseName || skillName.replace(/\d+$/, '');
+                if (!this.isSkillCompatible(config, rowData.damageKind)) return;
 
                 if (config.type === 1) {
                     // 乘法减伤 - 检查是否已经计算过该基础技能
                     if (!calculatedSkillBases.has(baseSkillName)) {
-                        type1Product *= config.coefficient;
+                        type1Product *= this.getCoefficientForDamageKind(config, rowData.damageKind);
                         calculatedSkillBases.add(baseSkillName);
                     }
                 } else if (config.type === 2) {
@@ -59,6 +60,22 @@ class Calculator {
         console.log(`计算 - 行${rowData.id}: 原始=${numberValue}, 乘法乘积=${type1Product}, 减法和=${type2Sum}, 结果=${summary}`);
 
         return summary;
+    }
+
+    getCoefficientForDamageKind(config, damageKind) {
+        const dynamicCoefficients = config.damageCoefficients;
+        if (dynamicCoefficients && dynamicCoefficients[damageKind]) {
+            return dynamicCoefficients[damageKind];
+        }
+        return config.coefficient;
+    }
+
+    isSkillCompatible(config, damageKind) {
+        return damageKind === 'all'
+            || config.damageKind === 'all'
+            || config.damageKind === 'mixed'
+            || !config.damageKind
+            || config.damageKind === damageKind;
     }
 }
 

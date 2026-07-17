@@ -71,7 +71,12 @@ class App {
             }
         }
 
-        // 4. 添加默认行
+        // 4. 初始化三个页面共用的承伤 CSV 数据源。
+        window.fflogsCsvImporter?.initSharedStore();
+        window.tankbusterPlanner?.init();
+        window.comprehensiveTimeline?.init();
+
+        // 5. 添加默认行
         dataHandler.addRow();
         dataHandler.addRow();
         dataHandler.addRow();

@@ -8,10 +8,10 @@
 const DEFAULT_SKILLS_CONFIG = {
     // 乘法减伤技能 (type: 1)
     '血仇1': { cooldown: 60, type: 1, coefficient: 0.90 },
-    '牵制1': { cooldown: 60, type: 1, coefficient: 0.95 },
+    '牵制1': { cooldown: 60, type: 1, coefficient: 0.95, damageCoefficients: { physical: 0.90, magic: 0.95 } },
     '血仇2': { cooldown: 60, type: 1, coefficient: 0.90 },
-    '牵制2': { cooldown: 60, type: 1, coefficient: 0.95 },
-    '病毒': { cooldown: 90, type: 1, coefficient: 0.90 },
+    '牵制2': { cooldown: 60, type: 1, coefficient: 0.95, damageCoefficients: { physical: 0.90, magic: 0.95 } },
+    '病毒': { cooldown: 90, type: 1, coefficient: 0.95, damageCoefficients: { physical: 0.95, magic: 0.90 } },
     '光之心': { cooldown: 90, type: 1, coefficient: 0.85 },
     '武装戍卫': { cooldown: 90, type: 1, coefficient: 0.80 },
     '幻光': { cooldown: 60, type: 1, coefficient: 0.90 },

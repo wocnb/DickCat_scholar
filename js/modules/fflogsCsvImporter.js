@@ -3,6 +3,27 @@
  * 支持时间/事件两列的 ACT 导出格式，以及带有常见英文或中文列名的 CSV。
  */
 class FFLogsCsvImporter {
+    constructor() {
+        this.sharedStoreInitialized = false;
+    }
+
+    initSharedStore() {
+        if (this.sharedStoreInitialized || !window.damageCsvStore) return;
+
+        this.sharedStoreInitialized = true;
+        window.damageCsvStore.subscribe((source, file) => {
+            if (source !== 'healer' || !file) return;
+            const rows = this.buildTimelineRows(file.text);
+            if (rows.length) this.applyTimeline(rows, file.name);
+        });
+
+        const existingFile = window.damageCsvStore.get('healer');
+        if (existingFile) {
+            const rows = this.buildTimelineRows(existingFile.text);
+            if (rows.length) this.applyTimeline(rows, existingFile.name);
+        }
+    }
+
     openFilePicker() {
         const input = document.getElementById('fflogsCsvInput');
         if (input) input.click();
@@ -10,6 +31,10 @@ class FFLogsCsvImporter {
 
     async importFile(file) {
         if (!file) return;
+        if (/-tank|-(?:mt|st)(?:[^/\\]*)\.csv$/i.test(file.name)) {
+            alert('团队减伤页面只接收治疗职业承伤 CSV；请在坦克页面分别导入 MT 与 ST CSV。');
+            return;
+        }
 
         try {
             const csvText = this.decodeCsv(await file.arrayBuffer());
@@ -23,7 +48,11 @@ class FFLogsCsvImporter {
             const confirmed = confirm(`将从 ${file.name} 生成 ${rows.length} 条时间轴，并覆盖当前表格。是否继续？`);
             if (!confirmed) return;
 
-            this.applyTimeline(rows, file.name);
+            if (window.damageCsvStore) {
+                window.damageCsvStore.set('healer', { name: file.name, text: csvText });
+            } else {
+                this.applyTimeline(rows, file.name);
+            }
         } catch (error) {
             console.error('FFLogs CSV 导入失败:', error);
             alert(`FFLogs CSV 导入失败：${error.message}`);
@@ -163,6 +192,7 @@ class FFLogsCsvImporter {
             string: this.formatTimelineTime(seconds),
             chineseText: ability,
             number: amount,
+            damageKind: 'all',
             skills,
             summary: amount,
             sourceOrder: record.index

@@ -25,6 +25,14 @@ class DataHandler {
         this.calculateAndUpdateSummary(rowId);
     }
 
+    updateDamageKind(rowId, damageKind) {
+        const rowData = dataManager.getRow(rowId);
+        if (!rowData) return;
+
+        rowData.damageKind = ['physical', 'magic'].includes(damageKind) ? damageKind : 'all';
+        this.calculateAndUpdateSummary(rowId);
+    }
+
     /**
      * 计算并更新总结值
      * @param {number} rowId - 行ID

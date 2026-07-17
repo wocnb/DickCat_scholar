@@ -173,6 +173,9 @@ class JobSelector {
             window.skillsConfigManager.updateConfigByJob(selectedJobs);
         }
 
+        window.tankbusterPlanner?.refreshResources();
+        window.comprehensiveTimeline?.render();
+
         if (this.onConfirmCallback) {
             this.onConfirmCallback(normalizedSelection);
         }

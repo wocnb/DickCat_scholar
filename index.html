@@ -14,6 +14,13 @@
         <p class="subtitle">不看就关注永雏塔菲喵</p>
 
         <!-- 配置选择器 -->
+        <div class="page-tabs" role="tablist" aria-label="减伤页面">
+            <button id="teamMitigationTab" class="page-tab active" type="button" role="tab" aria-selected="true" onclick="tankbusterPlanner.showPage('team')">团队减伤页面</button>
+            <button id="tankbusterTab" class="page-tab" type="button" role="tab" aria-selected="false" onclick="tankbusterPlanner.showPage('tankbuster')">坦克死刑减伤页面</button>
+            <button id="comprehensiveTimelineTab" class="page-tab" type="button" role="tab" aria-selected="false" onclick="tankbusterPlanner.showPage('comprehensive')">综合时间轴页面</button>
+        </div>
+
+        <section id="teamMitigationPage" class="page-view" role="tabpanel">
         <div class="config-selector-container">
             <label class="config-selector-label" for="configSelector">选择配置喵:</label>
             <select id="configSelector" class="config-selector" onchange="configHandler.onConfigChange(this.value)">
@@ -29,8 +36,10 @@
         <div class="button-container">
             <button class="btn btn-primary" onclick="jobSelector.open()">⚔️ 职业选择喵</button>
             <button class="btn btn-primary" onclick="dataHandler.addRow()">添加行喵</button>
+            <button class="btn btn-secondary" onclick="fflogsCsvImporter.openFilePicker()">导入 FFLogs CSV</button>
             <button class="btn btn-secondary" onclick="exportManager.exportData()">导出数据喵</button>
             <button class="btn btn-danger" onclick="dataHandler.clearAll()">清空表格喵</button>
+            <input id="fflogsCsvInput" type="file" accept=".csv,text/csv" hidden onchange="fflogsCsvImporter.importFile(this.files[0]); this.value = '';">
         </div>
 
         <table id="dataTable">
@@ -39,9 +48,10 @@
                     <th style="width: 12%;">时间喵</th>
                     <th style="width: 18%;">技能名字喵</th>
                     <th style="width: 12%;">技能伤害喵</th>
+                    <th style="width: 8%;">伤害属性</th>
                     <th style="width: 15%;">乘法减伤喵</th>
                     <th style="width: 15%;">减法减伤喵</th>
-                    <th style="width: 15%;">剩余伤害喵</th>
+                    <th style="width: 15%;">剩余伤害（±5%）喵</th>
                     <th style="width: 5%;">操作喵</th>
                 </tr>
             </thead>
@@ -49,6 +59,57 @@
                 <!-- 动态生成的行将插入这里 -->
             </tbody>
         </table>
+        </section>
+
+        <section id="tankbusterPage" class="page-view is-hidden" role="tabpanel">
+            <div class="tankbuster-toolbar">
+                <label class="tankbuster-target-control" for="tankbusterTarget">
+                    <span>默认目标坦克</span>
+                    <select id="tankbusterTarget" onchange="tankbusterPlanner.setTargetSlot(this.value)"></select>
+                </label>
+                <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.openTankCsvPicker('row0')">导入 MT CSV</button>
+                <button class="btn btn-secondary" type="button" onclick="tankbusterPlanner.openTankCsvPicker('row1')">导入 ST CSV</button>
+                <input id="mtTankCsvInput" type="file" accept=".csv,text/csv" hidden onchange="tankbusterPlanner.importTankCsv(this.files[0], 'row0'); this.value = '';">
+                <input id="stTankCsvInput" type="file" accept=".csv,text/csv" hidden onchange="tankbusterPlanner.importTankCsv(this.files[0], 'row1'); this.value = '';">
+                <div id="tankbusterPartySummary" class="tankbuster-party-summary"></div>
+                <button class="btn btn-primary" type="button" onclick="tankbusterPlanner.addRow()">添加死刑</button>
+            </div>
+            <div id="tankbusterRows" class="tankbuster-rows"></div>
+        </section>
+
+        <section id="comprehensiveTimelinePage" class="page-view is-hidden" role="tabpanel">
+            <div class="comprehensive-toolbar">
+                <button class="btn btn-secondary" type="button" onclick="comprehensiveTimeline.openFilePicker('healer')">导入治疗承伤 CSV</button>
+                <button class="btn btn-secondary" type="button" onclick="comprehensiveTimeline.openFilePicker('mt')">导入 MT CSV</button>
+                <button class="btn btn-secondary" type="button" onclick="comprehensiveTimeline.openFilePicker('st')">导入 ST CSV</button>
+                <input id="healerDamageCsvInput" type="file" accept=".csv,text/csv" hidden onchange="comprehensiveTimeline.importSourceFile(this.files[0], 'healer'); this.value = '';">
+                <input id="mtDamageCsvInput" type="file" accept=".csv,text/csv" hidden onchange="comprehensiveTimeline.importSourceFile(this.files[0], 'mt'); this.value = '';">
+                <input id="stDamageCsvInput" type="file" accept=".csv,text/csv" hidden onchange="comprehensiveTimeline.importSourceFile(this.files[0], 'st'); this.value = '';">
+                <span id="comprehensiveImportStatus" class="comprehensive-import-status">还需治疗承伤、MT、ST CSV</span>
+                <label class="comprehensive-filter">
+                    <span>来源</span>
+                    <select id="comprehensiveSourceFilter" onchange="comprehensiveTimeline.applyFilters()">
+                        <option value="all">全部</option>
+                        <option value="team">团队伤害</option>
+                        <option value="tank">坦克承伤</option>
+                    </select>
+                </label>
+                <label class="comprehensive-filter">
+                    <span>目标</span>
+                    <select id="comprehensiveTargetFilter" onchange="comprehensiveTimeline.applyFilters()"></select>
+                </label>
+                <label class="comprehensive-filter">
+                    <span>最低伤害</span>
+                    <input id="comprehensiveMinDamage" type="number" min="0" placeholder="0" oninput="comprehensiveTimeline.applyFilters()">
+                </label>
+                <label class="comprehensive-filter comprehensive-keyword-filter">
+                    <span>技能筛选</span>
+                    <input id="comprehensiveKeywordFilter" type="search" placeholder="技能名称" oninput="comprehensiveTimeline.applyFilters()">
+                </label>
+                <span id="comprehensiveTimelineCount" class="comprehensive-count">0 / 0 条</span>
+            </div>
+            <div id="comprehensiveTimelineRows" class="comprehensive-timeline-rows"></div>
+        </section>
     </div>
 
     <!-- JavaScript 技能常量配置 -->
@@ -70,6 +131,10 @@
     <script src="js/modules/configHandler.js"></script>
     <script src="js/modules/skillsConfigManager.js"></script>
     <script src="js/modules/jobSelector.js"></script>
+    <script src="js/modules/fflogsCsvImporter.js"></script>
+    <script src="js/modules/damageCsvStore.js"></script>
+    <script src="js/modules/tankbusterPlanner.js"></script>
+    <script src="js/modules/comprehensiveTimeline.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
