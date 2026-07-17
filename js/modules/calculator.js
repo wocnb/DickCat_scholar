@@ -18,7 +18,7 @@ class Calculator {
      */
     calculateSummary(rowData) {
         const numberValue = parseFloat(rowData.number) || 0;
-        const skills = rowData.skills || {};
+        const skills = dataManager.getEffectiveSkills(rowData);
 
         // 计算乘法减伤 (type: 1) - 去重处理
         let type1Product = 1;

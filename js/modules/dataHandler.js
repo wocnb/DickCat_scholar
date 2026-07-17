@@ -21,8 +21,7 @@ class DataHandler {
         rowData.chineseText = chineseInput.value;
         rowData.number = numberInput.value;
 
-        // 重新计算总结
-        this.calculateAndUpdateSummary(rowId);
+        this.refreshTimelineCalculations();
     }
 
     updateDamageKind(rowId, damageKind) {
@@ -30,7 +29,7 @@ class DataHandler {
         if (!rowData) return;
 
         rowData.damageKind = ['physical', 'magic'].includes(damageKind) ? damageKind : 'all';
-        this.calculateAndUpdateSummary(rowId);
+        this.refreshTimelineCalculations();
     }
 
     /**
@@ -48,6 +47,15 @@ class DataHandler {
         uiRenderer.updateSummary(rowId, summary);
     }
 
+    refreshTimelineCalculations() {
+        dataManager.getAllData().forEach(rowData => {
+            const summary = calculator.calculateSummary(rowData);
+            rowData.summary = summary;
+            uiRenderer.updateSummary(rowData.id, summary);
+            uiRenderer.initInteractiveElements(rowData);
+        });
+    }
+
     /**
      * 添加新行
      */
@@ -63,6 +71,7 @@ class DataHandler {
     deleteRow(rowId) {
         if (dataManager.deleteRow(rowId)) {
             uiRenderer.removeRow(rowId);
+            this.refreshTimelineCalculations();
         }
     }
 

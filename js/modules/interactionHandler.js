@@ -14,16 +14,30 @@ class InteractionHandler {
 
         const skills = rowData.skills || {};
 
+        const inheritedFrom = dataManager.getInheritedSkillSource(rowData, skillName);
+        if (!skills[skillName] && inheritedFrom) {
+            alert(`${skillName} 已由 ${inheritedFrom.string} 的施放覆盖。`);
+            return;
+        }
+
+        if (!skills[skillName]) {
+            const schedule = dataManager.getSkillSchedule(rowData, skillName);
+            if (!schedule.ready) {
+                alert(`${skillName} 仍在冷却中，将于 ${this.formatTimelineTime(schedule.nextReadyAt)} 就绪。`);
+                return;
+            }
+        }
+
         // 切换技能状态
         skills[skillName] = !skills[skillName];
 
         console.log(`交互 - 行${rowId}, 技能"${skillName}", 状态: ${skills[skillName]}`);
 
-        // 更新UI
-        uiRenderer.updateSkillState(rowId, skillName, skills[skillName]);
+        dataHandler.refreshTimelineCalculations();
+    }
 
-        // 更新总结
-        dataHandler.calculateAndUpdateSummary(rowId);
+    formatTimelineTime(seconds) {
+        return window.fflogsCsvImporter?.formatTimelineTime(seconds) || `${seconds}s`;
     }
 }
 

@@ -538,88 +538,96 @@ function createBarrier(amount, cooldown, effect, options = {}) {
 }
 
 const Reprisal = () => createMitigation(10, 60, '使周围敌人造成伤害降低10%，持续15秒', {
-    scope: 'enemy'
+    scope: 'enemy',
+    duration: 15
 });
 
 const Feint = () => createMitigation(5, 90, '目标物理伤害降低10%，魔法伤害降低5%', {
     scope: 'enemy',
-    damageCoefficients: { physical: 0.90, magic: 0.95 }
+    damageCoefficients: { physical: 0.90, magic: 0.95 },
+    duration: 10
 });
 
 const Addle = () => createMitigation(5, 90, '目标物理伤害降低5%，魔法伤害降低10%', {
     scope: 'enemy',
-    damageCoefficients: { physical: 0.95, magic: 0.90 }
+    damageCoefficients: { physical: 0.95, magic: 0.90 },
+    duration: 10
 });
 
 const Paladin = {
     '血仇': Reprisal(),
-    '圣光幕帘': createBarrier(19000, 90, '为自身和附近队友附加相当于自身最大HP 10%的护盾，持续30秒'),
-    '武装戍卫': createMitigation(15, 120, '身后扇形范围内队友受到伤害变为85%，持续18秒')
+    '圣光幕帘': createBarrier(19000, 90, '为自身和附近队友附加相当于自身最大HP 10%的护盾，持续30秒', { duration: 30 }),
+    '武装戍卫': createMitigation(15, 120, '身后扇形范围内队友受到伤害变为85%，持续18秒', { duration: 18 })
 };
 
 const DarkKnight = {
     '血仇': Reprisal(),
     '暗黑布道': createMitigation(10, 90, '自身和附近队友受到的物理伤害降低5%、魔法伤害降低10%，持续15秒', {
-        damageKind: 'magic'
+        damageCoefficients: { physical: 0.95, magic: 0.90 },
+        duration: 15
     })
 };
 
 const Gunbreaker = {
     '血仇': Reprisal(),
     '光之心': createMitigation(10, 90, '自身和附近队友受到的物理伤害降低5%、魔法伤害降低10%，持续15秒', {
-        damageKind: 'magic'
+        damageCoefficients: { physical: 0.95, magic: 0.90 },
+        duration: 15
     })
 };
 
 const Warrior = {
     '血仇': Reprisal(),
-    '摆脱': createBarrier(28500, 90, '为自身和附近队友附加相当于最大HP 15%的护盾，持续30秒')
+    '摆脱': createBarrier(28500, 90, '为自身和附近队友附加相当于最大HP 15%的护盾，持续30秒', { duration: 30 })
 };
 
 const Scholar = {
-    '野战治疗阵': createMitigation(10, 30, '区域内队友受到伤害变为90%，持续15秒'),
-    '疾风怒涛': createMitigation(10, 120, '附近队友获得移动速度提升，并受到伤害降低10%，持续20秒'),
+    '野战治疗阵': createMitigation(10, 30, '区域内队友受到伤害变为90%，持续15秒', { duration: 15 }),
+    '疾风怒涛': createMitigation(10, 120, '附近队友获得移动速度提升，并受到伤害降低10%，持续20秒', { duration: 20 }),
     '幻光': createMitigation(5, 120, '附近队友治疗魔法效果提高10%，受到魔法伤害降低5%，持续20秒', {
-        damageKind: 'magic'
+        damageKind: 'magic',
+        duration: 20
     }),
-    '群盾': createBarrier(27000, 0, '学者群体护盾估算值，用于减法减伤列'),
-    '扩散盾': createBarrier(73000, 120, '展开战术扩散后的大盾估算值，用于减法减伤列')
+    '群盾': createBarrier(27000, 0, '学者群体护盾估算值，用于减法减伤列', { duration: 30 }),
+    '扩散盾': createBarrier(73000, 120, '展开战术扩散后的大盾估算值，用于减法减伤列', { duration: 30 })
 };
 
 const Sage = {
-    '坚角清汁': createMitigation(10, 30, '自身和附近队友受到伤害降低10%，持续15秒'),
-    '整体论': createMitigation(10, 120, '治疗全队并附加护盾，同时使附近队友受到伤害降低10%，持续20秒'),
-    '泛输血': createBarrier(30000, 120, '为自身和附近队友附加可刷新护盾，持续15秒'),
-    '均衡预后': createBarrier(27000, 0, '贤者群体护盾估算值，用于减法减伤列')
+    '坚角清汁': createMitigation(10, 30, '自身和附近队友受到伤害降低10%，持续15秒', { duration: 15 }),
+    '整体论': createMitigation(10, 120, '治疗全队并附加护盾，同时使附近队友受到伤害降低10%，持续20秒', { duration: 20 }),
+    '泛输血': createBarrier(30000, 120, '为自身和附近队友附加可刷新护盾，持续15秒', { duration: 15 }),
+    '均衡预后': createBarrier(27000, 0, '贤者群体护盾估算值，用于减法减伤列', { duration: 30 })
 };
 
 const WhiteMage = {
-    '全大赦': createMitigation(10, 60, '为自身和附近队友附加Confession，并使受到伤害降低10%，持续10秒'),
-    '节制': createMitigation(10, 120, '治疗魔法效果提高20%，自身和50米内队友受到伤害降低10%，持续20秒'),
-    '神爱抚': createBarrier(24000, 120, '消耗Divine Grace，为自身和附近队友附加400治疗威力护盾')
+    '全大赦': createMitigation(10, 60, '为自身和附近队友附加Confession，并使受到伤害降低10%，持续10秒', { duration: 10 }),
+    '节制': createMitigation(10, 120, '治疗魔法效果提高20%，自身和50米内队友受到伤害降低10%，持续20秒', { duration: 20 }),
+    '神爱抚': createBarrier(24000, 120, '消耗Divine Grace，为自身和附近队友附加400治疗威力护盾', { duration: 30 })
 };
 
 const Astrologian = {
-    '命运之轮': createMitigation(10, 60, '自身和附近队友受到伤害降低10%，并附加持续恢复'),
+    '命运之轮': createMitigation(10, 60, '自身和附近队友受到伤害降低10%，并附加持续恢复', { duration: 15 }),
     '中间学派群体盾': createBarrier(27000, 0, '中间学派期间由群体治疗附加的群体魔法护盾；可在状态持续期间重复施放', {
-        repeatable: true
+        repeatable: true,
+        duration: 30
     }),
-    '太阳星座': createMitigation(10, 120, '太阳星座独立提供团队10%减伤，持续15秒')
+    '太阳星座': createMitigation(10, 120, '太阳星座独立提供团队10%减伤，持续15秒', { duration: 15 })
 };
 
 const Bard = {
-    '行吟': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒')
+    '行吟': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒', { duration: 15 })
 };
 
 const Machinist = {
-    '策动': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒'),
+    '策动': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒', { duration: 15 }),
     '拆除': createMitigation(10, 120, '降低目标造成的伤害10%，持续10秒', {
-        scope: 'enemy'
+        scope: 'enemy',
+        duration: 10
     })
 };
 
 const Dancer = {
-    '防守之桑巴': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒')
+    '防守之桑巴': createMitigation(15, 90, '自身和附近队友受到伤害降低15%，持续15秒', { duration: 15 })
 };
 
 const Monk = { '牵制': Feint() };
@@ -627,7 +635,7 @@ const Ninja = { '牵制': Feint() };
 const Dragoon = { '牵制': Feint() };
 const Reaper = {
     '牵制': Feint(),
-    '神秘纹': createBarrier(19000, 30, '自身10%最大HP护盾，破盾后为附近队友附加持续恢复')
+    '神秘纹': createBarrier(19000, 30, '自身10%最大HP护盾，破盾后为附近队友附加持续恢复', { duration: 30 })
 };
 const Viper = { '牵制': Feint() };
 const Samurai = { '牵制': Feint() };
@@ -637,12 +645,13 @@ const Summoner = { '病毒': Addle() };
 const RedMage = {
     '病毒': Addle(),
     '抗死': createMitigation(10, 120, '自身和附近队友受到魔法伤害降低10%，并提高受到的治疗效果5%，持续10秒', {
-        damageKind: 'magic'
+        damageKind: 'magic',
+        duration: 10
     })
 };
 const Pictomancer = {
     '病毒': Addle(),
-    '坦培拉厚涂': createBarrier(19000, 120, '移除Tempera Coat，为自身和附近队友附加10%最大HP护盾')
+    '坦培拉厚涂': createBarrier(19000, 120, '移除Tempera Coat，为自身和附近队友附加10%最大HP护盾', { duration: 30 })
 };
 
 const JOB_SKILLS_MAP = {

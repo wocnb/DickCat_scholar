@@ -105,7 +105,7 @@ class UIRenderer {
      * @param {Object} rowData - 行数据对象
      */
     initInteractiveElements(rowData) {
-        const skills = rowData.skills || {};
+        const skills = dataManager.getEffectiveSkills(rowData);
 
         // 渲染type1技能 (乘法减伤)
         this.renderSkillsByType(rowData.id, 1, skills);
@@ -217,11 +217,6 @@ class UIRenderer {
         return `${skillName}${sourceJob}${cooldown}${effect || `\n${baseName}`}`;
     }
 
-    /**
-     * 缺少技能图标时显示短标签
-     * @param {string} skillName - 技能名称
-     * @returns {string} 短标签
-     */
     getFallbackLabel(skillName) {
         const baseName = (this.skillsConfig[skillName]?.baseName || skillName).replace(/\d+$/, '');
         return baseName.length <= 2 ? baseName : baseName.slice(0, 2);

@@ -81,6 +81,95 @@ class DataManager {
         return [...this.tableData];
     }
 
+    getEffectiveSkills(rowData) {
+        const effectiveSkills = { ...(rowData?.skills || {}) };
+        const rowTime = this.parseTimelineTime(rowData?.string);
+        if (!Number.isFinite(rowTime)) return effectiveSkills;
+
+        this.tableData.forEach(sourceRow => {
+            const sourceTime = this.parseTimelineTime(sourceRow.string);
+            if (!Number.isFinite(sourceTime) || sourceTime > rowTime) return;
+
+            Object.entries(sourceRow.skills || {}).forEach(([skillName, isActive]) => {
+                const config = window.SKILL_CONSTANTS?.SKILLS_CONFIG?.[skillName];
+                if (!isActive || !config?.duration) return;
+                if (rowTime - sourceTime <= config.duration) effectiveSkills[skillName] = true;
+            });
+        });
+
+        return effectiveSkills;
+    }
+
+    getInheritedSkillSource(rowData, skillName) {
+        if (rowData?.skills?.[skillName]) return null;
+
+        const rowTime = this.parseTimelineTime(rowData?.string);
+        const config = window.SKILL_CONSTANTS?.SKILLS_CONFIG?.[skillName];
+        if (!Number.isFinite(rowTime) || !config?.duration) return null;
+
+        return this.tableData
+            .filter(candidate => candidate.id !== rowData.id && candidate.skills?.[skillName])
+            .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.string) }))
+            .filter(candidate => Number.isFinite(candidate.time)
+                && candidate.time <= rowTime
+                && rowTime - candidate.time <= config.duration)
+            .sort((left, right) => right.time - left.time)[0]?.row || null;
+    }
+
+    getSkillSchedule(rowData, skillName) {
+        const rowTime = this.parseTimelineTime(rowData?.string);
+        const config = window.SKILL_CONSTANTS?.SKILLS_CONFIG?.[skillName];
+        if (!Number.isFinite(rowTime) || !config?.cooldown || config.repeatable) {
+            return { ready: true, cooldownStartsAt: 0, nextReadyAt: 0 };
+        }
+
+        const previousUses = this.tableData
+            .filter(candidate => candidate.id !== rowData.id && candidate.skills?.[skillName])
+            .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.string) }))
+            .filter(candidate => Number.isFinite(candidate.time) && candidate.time <= rowTime)
+            .sort((left, right) => left.time - right.time);
+
+        let nextReadyAt = 0;
+        previousUses.forEach(use => {
+            const activationTime = this.getSkillActivationTime(use.time, config);
+            if (activationTime < nextReadyAt) return;
+            nextReadyAt = activationTime + config.cooldown;
+        });
+
+        const requestedActivationTime = this.getSkillActivationTime(rowTime, config);
+
+        return {
+            ready: requestedActivationTime >= nextReadyAt,
+            cooldownStartsAt: nextReadyAt ? nextReadyAt - config.cooldown : 0,
+            nextReadyAt
+        };
+    }
+
+    getSkillActivationTime(selectionTime, config) {
+        return selectionTime;
+    }
+
+    getSkillCoverageEnd(castTime, config) {
+        if (!config?.duration) return castTime;
+
+        return this.tableData
+            .map(candidate => ({ time: this.parseTimelineTime(candidate.string), damage: Number(candidate.number) || 0 }))
+            .filter(candidate => Number.isFinite(candidate.time)
+                && candidate.damage > 0
+                && candidate.time >= castTime
+                && candidate.time <= castTime + config.duration)
+            .reduce((latestTime, candidate) => Math.max(latestTime, candidate.time), castTime);
+    }
+
+    parseTimelineTime(value) {
+        const text = String(value || '').trim();
+        const minuteMatch = text.match(/^(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?$/i);
+        if (minuteMatch && (minuteMatch[1] || minuteMatch[2])) {
+            return (Number(minuteMatch[1]) || 0) * 60 + (Number(minuteMatch[2]) || 0);
+        }
+        return window.fflogsCsvImporter?.parseTime(text);
+    }
+
     /**
      * 清空所有数据
      */

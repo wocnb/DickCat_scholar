@@ -238,10 +238,11 @@ class TankbusterPlanner {
 
     setDamageMode(rowId, damageMode) {
         const row = this.rows.find(item => item.id === rowId);
-        if (!row || !['solo', 'shared'].includes(damageMode)) return;
+        if (!row || !['solo', 'shared', 'none'].includes(damageMode)) return;
 
         row.damageMode = damageMode;
         if (damageMode === 'shared') row.splitCount = Math.max(2, Number(row.splitCount) || 2);
+        if (damageMode === 'none') row.selectedResources = [];
         this.renderRows();
     }
 
@@ -251,6 +252,11 @@ class TankbusterPlanner {
 
         const resource = this.getAvailableResources(row).find(item => item.id === resourceId);
         if (!resource) return;
+
+        if (!this.isResourceCompatible(resource, row.damageKind)) {
+            alert(`${resource.name} 不适用于当前伤害类型。`);
+            return;
+        }
 
         if (!row.selectedResources.includes(resourceId) && !this.isResourceReadyForRow(row, resource)) {
             const schedule = this.getResourceSchedule(row, resource);
@@ -371,6 +377,7 @@ class TankbusterPlanner {
                         <div class="tankbuster-mode-control" role="group" aria-label="承伤方式">
                             <button class="${row.damageMode === 'solo' ? 'active' : ''}" type="button" onclick="tankbusterPlanner.setDamageMode(${row.id}, 'solo')">单吃</button>
                             <button class="${row.damageMode === 'shared' ? 'active' : ''}" type="button" onclick="tankbusterPlanner.setDamageMode(${row.id}, 'shared')">分摊</button>
+                            <button class="${row.damageMode === 'none' ? 'active' : ''}" type="button" onclick="tankbusterPlanner.setDamageMode(${row.id}, 'none')">不吃</button>
                         </div>
                     </div>
                     ${row.damageMode === 'shared' ? `
@@ -390,9 +397,11 @@ class TankbusterPlanner {
                     </div>
                     <button class="btn btn-danger btn-sm" type="button" onclick="tankbusterPlanner.deleteRow(${row.id})">删除</button>
                 </div>
-                <div class="tankbuster-resource-groups">
-                    ${Object.keys(this.categoryLabels).map(category => this.renderResourceGroup(row, category, resources)).join('')}
-                </div>
+                ${row.damageMode === 'none' ? '' : `
+                    <div class="tankbuster-resource-groups">
+                        ${Object.keys(this.categoryLabels).map(category => this.renderResourceGroup(row, category, resources)).join('')}
+                    </div>
+                `}
             </article>
         `;
     }
@@ -534,8 +543,9 @@ class TankbusterPlanner {
     }
 
     renderResourceButton(row, resource) {
-        const active = row.selectedResources.includes(resource.id);
-        const inherited = !active && this.getInheritedResourceUse(row, resource);
+        const compatible = this.isResourceCompatible(resource, row.damageKind);
+        const active = compatible && row.selectedResources.includes(resource.id);
+        const inherited = compatible && !active && this.getInheritedResourceUse(row, resource);
         const schedule = this.getResourceSchedule(row, resource);
         const source = `${resource.sourceSlot.label} ${resource.sourceJob.name}`;
         const mitigation = this.getResourceMitigationLabel(resource, row);
@@ -543,16 +553,17 @@ class TankbusterPlanner {
             ? '可重复施放'
             : `CD ${resource.cooldown}s${resource.charges > 1 ? ` / ${resource.charges}充能` : ''}${resource.duration ? ` / 持续 ${resource.duration}s` : ''}`;
         const scheduleText = !schedule.ready
-            ? ` / 冷却至 ${this.formatTimelineTime(schedule.nextReadyAt)}`
+            ? ` / 自 ${this.formatTimelineTime(schedule.cooldownStartsAt)} 冷却至 ${this.formatTimelineTime(schedule.nextReadyAt)}`
             : inherited
                 ? ` / 由 ${inherited.row.time} 的施放覆盖`
                 : '';
-        const title = `${resource.name} / ${source} / ${mitigation} / ${availability}${scheduleText}\n${resource.effect}`;
+        const compatibilityText = compatible ? '' : ' / 不适用于当前伤害类型';
+        const title = `${resource.name} / ${source} / ${mitigation} / ${availability}${compatibilityText}${scheduleText}\n${resource.effect}`;
         const imageName = this.getResourceImageName(resource.name);
 
         return `
             <button
-                class="tank-resource ${active ? 'active' : ''} ${inherited ? 'covered' : ''} ${!active && !schedule.ready ? 'on-cooldown' : ''}"
+                class="tank-resource ${active ? 'active' : ''} ${inherited ? 'covered' : ''} ${!compatible ? 'incompatible' : ''} ${compatible && !active && !inherited && !schedule.ready ? 'on-cooldown' : ''}"
                 type="button"
                 title="${this.escapeHtml(title)}"
                 aria-label="${this.escapeHtml(title)}"
@@ -592,6 +603,14 @@ class TankbusterPlanner {
     }
 
     renderResultMarkup(calculation, deathStatus) {
+        if (calculation.notTaking) {
+            return `
+                <span>承伤结果</span>
+                <strong>不吃</strong>
+                <small class="tankbuster-death-status normal">该坦克不承受此技能</small>
+            `;
+        }
+
         const sourceDamage = calculation.multiplier > 1
             ? `U ${calculation.rawDamage.toFixed(2)} × ${calculation.multiplier} = ${calculation.effectiveDamage.toFixed(2)}`
             : `U ${calculation.effectiveDamage.toFixed(2)}`;
@@ -614,6 +633,19 @@ class TankbusterPlanner {
     }
 
     calculateDamage(row, resources) {
+        if (row.damageMode === 'none') {
+            return {
+                notTaking: true,
+                damage: 0,
+                low: 0,
+                high: 0,
+                rawDamage: Number(row.damage) || 0,
+                multiplier: 0,
+                effectiveDamage: 0,
+                maxHpMultiplier: 1
+            };
+        }
+
         const rawDamage = Number(row.damage) || 0;
         const multiplier = row.damageMode === 'shared'
             ? Math.max(2, Number(row.splitCount) || 2)
@@ -645,6 +677,8 @@ class TankbusterPlanner {
     }
 
     getDeathStatus(row, calculation) {
+        if (calculation.notTaking) return { kind: 'normal', text: '该坦克不承受此技能' };
+
         const target = this.getTankMembers().find(member => member.slot.key === row.targetSlot);
         if (!target?.maxHp) return { kind: 'pending', text: '血量上限待设置，无法判断死刑' };
 
@@ -680,12 +714,13 @@ class TankbusterPlanner {
             ...this.getPartyResources()
         ];
 
-        return resources.filter(resource => this.isResourceCompatible(resource, row.damageKind));
+        return resources;
     }
 
     getAppliedResources(row, resources) {
-        const direct = resources.filter(resource => row.selectedResources.includes(resource.id));
-        const inherited = resources.filter(resource => !row.selectedResources.includes(resource.id)
+        const compatibleResources = resources.filter(resource => this.isResourceCompatible(resource, row.damageKind));
+        const direct = compatibleResources.filter(resource => row.selectedResources.includes(resource.id));
+        const inherited = compatibleResources.filter(resource => !row.selectedResources.includes(resource.id)
             && this.getInheritedResourceUse(row, resource));
         return [...direct, ...inherited];
     }
@@ -755,8 +790,9 @@ class TankbusterPlanner {
 
     isResourceCompatible(resource, damageKind) {
         if (resource.damageCoefficients) return true;
-        if (damageKind === 'all' || resource.damageKind === 'all' || resource.damageKind === 'mixed') return true;
-        return resource.damageKind === damageKind;
+        const resourceDamageKind = resource.damageKind || 'all';
+        if (damageKind === 'all' || resourceDamageKind === 'all' || resourceDamageKind === 'mixed') return true;
+        return resourceDamageKind === damageKind;
     }
 
     getResourceCoefficient(resource, damageKind) {
@@ -767,7 +803,7 @@ class TankbusterPlanner {
     getResourceSchedule(row, resource) {
         const rowTime = this.parseTimelineTime(row.time);
         if (!Number.isFinite(rowTime) || !resource.cooldown || resource.repeatable) {
-            return { ready: true, nextReadyAt: 0 };
+            return { ready: true, cooldownStartsAt: 0, nextReadyAt: 0 };
         }
 
         const previousUses = this.rows
@@ -779,13 +815,43 @@ class TankbusterPlanner {
 
         previousUses.forEach(use => {
             const earliestCharge = Math.min(...nextChargeTimes);
-            if (use.time < earliestCharge) return;
+            const activationTime = this.getResourceActivationTime(use.time, resource);
+            if (activationTime < earliestCharge) return;
             const chargeIndex = nextChargeTimes.indexOf(earliestCharge);
-            nextChargeTimes[chargeIndex] = use.time + resource.cooldown;
+            nextChargeTimes[chargeIndex] = activationTime + resource.cooldown;
         });
 
         const nextReadyAt = Math.min(...nextChargeTimes);
-        return { ready: rowTime >= nextReadyAt, nextReadyAt };
+        const requestedActivationTime = this.getResourceActivationTime(rowTime, resource);
+        return {
+            ready: requestedActivationTime >= nextReadyAt,
+            cooldownStartsAt: nextReadyAt ? nextReadyAt - resource.cooldown : 0,
+            nextReadyAt
+        };
+    }
+
+    getResourceActivationTime(selectionTime, resource) {
+        return selectionTime;
+    }
+
+    getResourceCoverageEnd(castTime, resource) {
+        if (!resource.duration) return castTime;
+
+        return this.rows
+            .map(candidate => ({ row: candidate, time: this.parseTimelineTime(candidate.time), damage: Number(candidate.damage) || 0 }))
+            .filter(candidate => Number.isFinite(candidate.time)
+                && candidate.damage > 0
+                && candidate.row.damageMode !== 'none'
+                && this.isResourceApplicableToRow(resource, candidate.row)
+                && candidate.time >= castTime
+                && candidate.time <= castTime + resource.duration)
+            .reduce((latestTime, candidate) => Math.max(latestTime, candidate.time), castTime);
+    }
+
+    isResourceApplicableToRow(resource, row) {
+        if (resource.category === 'self') return row.targetSlot === resource.sourceSlot.key;
+        if (resource.category === 'cotank') return row.targetSlot !== resource.sourceSlot.key;
+        return true;
     }
 
     isResourceReadyForRow(row, resource) {
@@ -869,6 +935,7 @@ const maxHpResource = (name, percent, cooldown, duration, effect, options = {}) 
 const TANKBUSTER_SELF_RESOURCES = {
     pld: [
         percentResource('铁壁', 20, 90, '自身受到伤害降低20%；额外提高自身受到治疗效果15%', { duration: 20 }),
+        percentResource('壁垒', 20, 90, '保证格挡全部伤害；按20%格挡减伤计算', { duration: 10 }),
         percentResource('卫戍', 40, 120, '自身受到伤害降低40%，并获得相当于治疗量1,000 potency的护盾', { duration: 15 }),
         percentResource('神圣盾阵', 15, 5, '8秒内受到伤害降低15%；前4秒额外获得骑士的坚守15%。按重叠阶段计算为27.75%减伤', { duration: 8, mitigationLayers: [15, 15] }),
         percentResource('神圣领域', 100, 420, '免疫绝大多数攻击', { duration: 10 })
